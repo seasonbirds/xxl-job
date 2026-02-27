@@ -38,7 +38,7 @@
 		<jakarta.annotation-api.version>3.0.0</jakarta.annotation-api.version>
 
 		<!-- spring -->
-		<spring-boot.version>4.0.1</spring-boot.version>
+		<spring-boot.version>3.2.5</spring-boot.version>
 		<spring.version>7.0.2</spring.version>
 		<!-- mybatis & db -->
 		<mybatis-spring-boot-starter.version>4.0.1</mybatis-spring-boot-starter.version>

@@ -1,6 +1,10 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.annotation.OpLog;
+import com.xxl.job.admin.constant.OpLogModule;
+import com.xxl.job.admin.constant.OpLogType;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
+import com.xxl.job.admin.mapper.XxlJobInfoMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobInfo;
 import com.xxl.job.admin.scheduler.exception.XxlJobException;
@@ -44,6 +48,8 @@ public class JobInfoController {
 
 	@Resource
 	private XxlJobGroupMapper xxlJobGroupMapper;
+	@Resource
+	private XxlJobInfoMapper xxlJobInfoMapper;
 	@Resource
 	private XxlJobService xxlJobService;
 	
@@ -98,6 +104,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/insert")
 	@ResponseBody
+	@OpLog(module = OpLogModule.JOB_INFO, type = OpLogType.ADD, targetId = "#jobInfo.id", targetName = "#jobInfo.jobDesc", jobGroup = "#jobInfo.jobGroup", content = "'新增任务：' + #jobInfo.jobDesc")
 	public Response<String> add(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -108,6 +115,7 @@ public class JobInfoController {
 
 	@RequestMapping("/update")
 	@ResponseBody
+	@OpLog(module = OpLogModule.JOB_INFO, type = OpLogType.UPDATE, targetId = "#jobInfo.id", targetName = "#jobInfo.jobDesc", jobGroup = "#jobInfo.jobGroup", content = "'编辑任务：' + #jobInfo.jobDesc")
 	public Response<String> update(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -118,6 +126,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/delete")
 	@ResponseBody
+	@OpLog(module = OpLogModule.JOB_INFO, type = OpLogType.DELETE, targetId = "#ids[0]", content = "'删除任务'")
 	public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -132,6 +141,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/stop")
 	@ResponseBody
+	@OpLog(module = OpLogModule.JOB_INFO, type = OpLogType.STOP, targetId = "#ids[0]", content = "'停止任务'")
 	public Response<String> pause(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -146,6 +156,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/start")
 	@ResponseBody
+	@OpLog(module = OpLogModule.JOB_INFO, type = OpLogType.START, targetId = "#ids[0]", content = "'启动任务'")
 	public Response<String> start(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid

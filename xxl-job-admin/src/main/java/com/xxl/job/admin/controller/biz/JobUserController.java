@@ -1,6 +1,9 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.annotation.OpLog;
 import com.xxl.job.admin.constant.Consts;
+import com.xxl.job.admin.constant.OpLogModule;
+import com.xxl.job.admin.constant.OpLogType;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
@@ -79,7 +82,8 @@ public class JobUserController {
     @RequestMapping("/insert")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
-    public Response<String> insert(XxlJobUser xxlJobUser) {
+    @OpLog(module = OpLogModule.USER, type = OpLogType.ADD, targetId = "#xxlJobUser.username", targetName = "#xxlJobUser.username", content = "'新增用户：' + #xxlJobUser.username")
+    public Response<String> insert(HttpServletRequest request, XxlJobUser xxlJobUser) {
 
         // valid username
         if (StringTool.isBlank(xxlJobUser.getUsername())) {
@@ -109,12 +113,14 @@ public class JobUserController {
 
         // write
         xxlJobUserMapper.save(xxlJobUser);
+
         return Response.ofSuccess();
     }
 
     @RequestMapping("/update")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OpLog(module = OpLogModule.USER, type = OpLogType.UPDATE, targetId = "#xxlJobUser.username", targetName = "#xxlJobUser.username", content = "'编辑用户：' + #xxlJobUser.username")
     public Response<String> update(HttpServletRequest request, XxlJobUser xxlJobUser) {
 
         // avoid opt login seft
@@ -138,12 +144,14 @@ public class JobUserController {
 
         // write
         xxlJobUserMapper.update(xxlJobUser);
+
         return Response.ofSuccess();
     }
 
     @RequestMapping("/delete")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OpLog(module = OpLogModule.USER, type = OpLogType.DELETE, targetId = "#ids[0]", content = "'删除用户'")
     public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
         // valid
@@ -158,6 +166,7 @@ public class JobUserController {
         }
 
         xxlJobUserMapper.delete(ids.get(0));
+
         return Response.ofSuccess();
     }
 

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xxl.job.admin.mapper.XxlJobOpLogMapper">
+
+    <resultMap id="XxlJobOpLog" type="com.xxl.job.admin.model.XxlJobOpLog">
+        <result column="id" property="id"/>
+        <result column="module" property="module"/>
+        <result column="type" property="type"/>
+        <result column="operator" property="operator"/>
+        <result column="op_time" property="opTime"/>
+        <result column="op_ip" property="opIp"/>
+        <result column="target_id" property="targetId"/>
+        <result column="target_name" property="targetName"/>
+        <result column="content" property="content"/>
+        <result column="job_group" property="jobGroup"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        t.id,
+        t.module,
+        t.type,
+        t.operator,
+        t.op_time,
+        t.op_ip,
+        t.target_id,
+        t.target_name,
+        t.content,
+        t.job_group
+    </sql>
+
+    <select id="pageList" resultMap="XxlJobOpLog">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM xxl_job_op_log AS t
+        <trim prefix="WHERE" prefixOverrides="AND | OR">
+            <if test="module != null and module != ''">
+                AND t.module = #{module}
+            </if>
+            <if test="type != null and type != ''">
+                AND t.type = #{type}
+            </if>
+            <if test="operator != null and operator != ''">
+                AND t.operator like concat('%', #{operator}, '%')
+            </if>
+            <if test="jobGroup != null">
+                AND t.job_group = #{jobGroup}
+            </if>
+            <if test="opTimeStart != null">
+                AND t.op_time <![CDATA[ >= ]]> #{opTimeStart}
+            </if>
+            <if test="opTimeEnd != null">
+                AND t.op_time <![CDATA[ <= ]]> #{opTimeEnd}
+            </if>
+        </trim>
+        ORDER BY t.id DESC
+        LIMIT #{offset}, #{pagesize}
+    </select>
+
+    <select id="pageListCount" resultType="int">
+        SELECT count(1)
+        FROM xxl_job_op_log AS t
+        <trim prefix="WHERE" prefixOverrides="AND | OR">
+            <if test="module != null and module != ''">
+                AND t.module = #{module}
+            </if>
+            <if test="type != null and type != ''">
+                AND t.type = #{type}
+            </if>
+            <if test="operator != null and operator != ''">
+                AND t.operator like concat('%', #{operator}, '%')
+            </if>
+            <if test="jobGroup != null">
+                AND t.job_group = #{jobGroup}
+            </if>
+            <if test="opTimeStart != null">
+                AND t.op_time <![CDATA[ >= ]]> #{opTimeStart}
+            </if>
+            <if test="opTimeEnd != null">
+                AND t.op_time <![CDATA[ <= ]]> #{opTimeEnd}
+            </if>
+        </trim>
+    </select>
+
+    <insert id="save" parameterType="com.xxl.job.admin.model.XxlJobOpLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO xxl_job_op_log (
+            `module`,
+            `type`,
+            `operator`,
+            `op_time`,
+            `op_ip`,
+            `target_id`,
+            `target_name`,
+            `content`,
+            `job_group`
+        ) VALUES (
+            #{module},
+            #{type},
+            #{operator},
+            #{opTime},
+            #{opIp},
+            #{targetId},
+            #{targetName},
+            #{content},
+            #{jobGroup}
+        )
+    </insert>
+
+    <select id="load" resultMap="XxlJobOpLog">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM xxl_job_op_log AS t
+        WHERE t.id = #{id}
+    </select>
+
+</mapper>
