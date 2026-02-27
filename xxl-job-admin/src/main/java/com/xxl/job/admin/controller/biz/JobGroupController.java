@@ -1,6 +1,9 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.annotation.OpLog;
 import com.xxl.job.admin.constant.Consts;
+import com.xxl.job.admin.constant.OpLogModule;
+import com.xxl.job.admin.constant.OpLogType;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobRegistry;
 import com.xxl.job.admin.util.I18nUtil;
@@ -16,6 +19,7 @@ import com.xxl.tool.http.HttpTool;
 import com.xxl.tool.response.PageModel;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -68,7 +72,8 @@ public class JobGroupController {
 	@RequestMapping("/insert")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
-	public Response<String> insert(XxlJobGroup xxlJobGroup){
+	@OpLog(module = OpLogModule.JOB_GROUP, type = OpLogType.ADD, targetId = "#xxlJobGroup.id", targetName = "#xxlJobGroup.title", content = "'新增执行器：' + #xxlJobGroup.title")
+	public Response<String> insert(HttpServletRequest request, XxlJobGroup xxlJobGroup){
 
 		// valid
 		if (StringTool.isBlank(xxlJobGroup.getAppname())) {
@@ -109,13 +114,15 @@ public class JobGroupController {
 		xxlJobGroup.setUpdateTime(new Date());
 
 		int ret = xxlJobGroupMapper.save(xxlJobGroup);
+
 		return (ret>0)?Response.ofSuccess():Response.ofFail();
 	}
 
 	@RequestMapping("/update")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
-	public Response<String> update(XxlJobGroup xxlJobGroup){
+	@OpLog(module = OpLogModule.JOB_GROUP, type = OpLogType.UPDATE, targetId = "#xxlJobGroup.id", targetName = "#xxlJobGroup.title", content = "'编辑执行器：' + #xxlJobGroup.title")
+	public Response<String> update(HttpServletRequest request, XxlJobGroup xxlJobGroup){
 		// valid
 		if (StringTool.isBlank(xxlJobGroup.getAppname())) {
 			return Response.ofFail((I18nUtil.getString("system_please_input")+"AppName") );
@@ -155,6 +162,7 @@ public class JobGroupController {
 		xxlJobGroup.setUpdateTime(new Date());
 
 		int ret = xxlJobGroupMapper.update(xxlJobGroup);
+
 		return (ret>0)?Response.ofSuccess():Response.ofFail();
 	}
 
@@ -181,7 +189,8 @@ public class JobGroupController {
 	@RequestMapping("/delete")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
-	public Response<String> delete(@RequestParam("ids[]") List<Integer> ids){
+	@OpLog(module = OpLogModule.JOB_GROUP, type = OpLogType.DELETE, targetId = "#ids[0]", content = "'删除执行器'")
+	public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids){
 
 		// parse id
 		if (CollectionTool.isEmpty(ids) || ids.size()!=1) {
@@ -211,6 +220,7 @@ public class JobGroupController {
 		int ret = xxlJobGroupMapper.remove(id);
         // remove registry-data
         xxlJobRegistryMapper.removeByRegistryGroupAndKey(RegistType.EXECUTOR.name(), xxlJobGroup.getAppname());
+
 		return (ret>0)?Response.ofSuccess():Response.ofFail();
 	}
 

@@ -1,5 +1,8 @@
 package com.xxl.job.admin.controller.base;
 
+import com.xxl.job.admin.annotation.OpLog;
+import com.xxl.job.admin.constant.OpLogModule;
+import com.xxl.job.admin.constant.OpLogType;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.util.I18nUtil;
@@ -48,6 +51,7 @@ public class LoginController {
 	@RequestMapping(value="/doLogin", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OpLog(module = OpLogModule.LOGIN, type = OpLogType.LOGIN, targetId = "#userName", targetName = "#userName", content = "'用户登录：' + #userName")
 	public Response<String> doLogin(HttpServletRequest request, HttpServletResponse response, String userName, String password, String ifRemember){
 
 		// param
@@ -78,6 +82,7 @@ public class LoginController {
 	@RequestMapping(value="/logout", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OpLog(module = OpLogModule.LOGIN, type = OpLogType.LOGOUT, content = "'用户登出'")
 	public Response<String> logout(HttpServletRequest request, HttpServletResponse response){
 
 		// xxl-sso, do logout
