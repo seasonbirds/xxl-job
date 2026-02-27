@@ -55,22 +55,20 @@ public class IndexController {
 	 * fill menu data
 	 */
 	private List<XxlBootResourceDTO> findResourceList(HttpServletRequest request){
-		// login check
 		Response<LoginInfo> loginInfoResponse = XxlSsoHelper.loginCheckWithAttr(request);
-		// init menu-list
 		List<XxlBootResourceDTO> resourceDTOList = Arrays.asList(
 				new XxlBootResourceDTO(1, 0, I18nUtil.getString("job_dashboard_name"),1, "", "/dashboard", "fa-home", 1, 0, null),
 				new XxlBootResourceDTO(2, 0, I18nUtil.getString("jobinfo_name"),1, "", "/jobinfo", " fa-clock-o", 2, 0, null),
 				new XxlBootResourceDTO(3, 0, I18nUtil.getString("joblog_name"),1, "", "/joblog", " fa-database", 3, 0, null),
 				new XxlBootResourceDTO(4, 0, I18nUtil.getString("jobgroup_name"),1, Consts.ADMIN_ROLE, "/jobgroup", " fa-cloud", 4, 0,null),
 				new XxlBootResourceDTO(5, 0, I18nUtil.getString("user_manage"),1, Consts.ADMIN_ROLE, "/user", "fa-users", 5, 0, null),
-				new XxlBootResourceDTO(9, 0, I18nUtil.getString("admin_help"),1, "", "/help", "fa-book", 6, 0, null)
+				new XxlBootResourceDTO(6, 0, I18nUtil.getString("operationlog_name"),1, Consts.ADMIN_ROLE, "/operationlog", "fa-file-text-o", 6, 0, null),
+				new XxlBootResourceDTO(9, 0, I18nUtil.getString("admin_help"),1, "", "/help", "fa-book", 7, 0, null)
 		);
 
-		// filter by role
 		if (!XxlSsoHelper.hasRole(loginInfoResponse.getData(), Consts.ADMIN_ROLE).isSuccess()) {
 			resourceDTOList = resourceDTOList.stream()
-					.filter(resourceDTO -> StringTool.isBlank(resourceDTO.getPermission() ))	// normal user had no permission
+					.filter(resourceDTO -> StringTool.isBlank(resourceDTO.getPermission() ))
 					.collect(Collectors.toList());
 		}
 		resourceDTOList.stream().sorted(Comparator.comparing(XxlBootResourceDTO::getOrder)).toList();
