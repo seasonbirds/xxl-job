@@ -1,5 +1,8 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.aop.OperationLog;
+import com.xxl.job.admin.aop.OperationModuleEnum;
+import com.xxl.job.admin.aop.OperationTypeEnum;
 import com.xxl.job.admin.constant.Consts;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobRegistry;
@@ -68,6 +71,7 @@ public class JobGroupController {
 	@RequestMapping("/insert")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
+	@OperationLog(module = OperationModuleEnum.GROUP, type = OperationTypeEnum.ADD)
 	public Response<String> insert(XxlJobGroup xxlJobGroup){
 
 		// valid
@@ -115,6 +119,7 @@ public class JobGroupController {
 	@RequestMapping("/update")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
+	@OperationLog(module = OperationModuleEnum.GROUP, type = OperationTypeEnum.UPDATE)
 	public Response<String> update(XxlJobGroup xxlJobGroup){
 		// valid
 		if (StringTool.isBlank(xxlJobGroup.getAppname())) {
@@ -181,6 +186,7 @@ public class JobGroupController {
 	@RequestMapping("/delete")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
+	@OperationLog(module = OperationModuleEnum.GROUP, type = OperationTypeEnum.DELETE)
 	public Response<String> delete(@RequestParam("ids[]") List<Integer> ids){
 
 		// parse id
