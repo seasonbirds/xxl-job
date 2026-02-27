@@ -1,5 +1,8 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.annotation.OperationLog;
+import com.xxl.job.admin.constant.OperationModule;
+import com.xxl.job.admin.constant.OperationType;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobInfo;
@@ -98,6 +101,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/insert")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOBINFO, operationType = OperationType.ADD)
 	public Response<String> add(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -108,6 +112,7 @@ public class JobInfoController {
 
 	@RequestMapping("/update")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOBINFO, operationType = OperationType.EDIT)
 	public Response<String> update(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -118,6 +123,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/delete")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOBINFO, operationType = OperationType.DELETE)
 	public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -132,6 +138,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/stop")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOBINFO, operationType = OperationType.STOP)
 	public Response<String> pause(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -146,6 +153,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/start")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOBINFO, operationType = OperationType.START)
 	public Response<String> start(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid

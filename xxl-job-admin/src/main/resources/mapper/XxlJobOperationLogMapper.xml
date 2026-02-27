@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xxl.job.admin.mapper.XxlJobOperationLogMapper">
+
+    <resultMap id="XxlJobOperationLog" type="com.xxl.job.admin.model.XxlJobOperationLog">
+        <result column="id" property="id"/>
+        <result column="module" property="module"/>
+        <result column="operation_type" property="operationType"/>
+        <result column="operator" property="operator"/>
+        <result column="operate_time" property="operateTime"/>
+        <result column="ip" property="ip"/>
+        <result column="target_id" property="targetId"/>
+        <result column="target_name" property="targetName"/>
+        <result column="job_group_id" property="jobGroupId"/>
+        <result column="job_group_name" property="jobGroupName"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        t.id,
+        t.module,
+        t.operation_type,
+        t.operator,
+        t.operate_time,
+        t.ip,
+        t.target_id,
+        t.target_name,
+        t.job_group_id,
+        t.job_group_name
+    </sql>
+
+    <select id="pageList" parameterType="java.util.HashMap" resultMap="XxlJobOperationLog">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM xxl_job_operation_log AS t
+        <trim prefix="WHERE" prefixOverrides="AND | OR">
+            <if test="module != null and module != ''">
+                AND t.module = #{module}
+            </if>
+            <if test="operationType != null and operationType != ''">
+                AND t.operation_type = #{operationType}
+            </if>
+            <if test="operator != null and operator != ''">
+                AND t.operator like CONCAT(CONCAT('%', #{operator}), '%')
+            </if>
+            <if test="operateTimeStart != null">
+                AND t.operate_time &gt;= #{operateTimeStart}
+            </if>
+            <if test="operateTimeEnd != null">
+                AND t.operate_time &lt;= #{operateTimeEnd}
+            </if>
+            <if test="jobGroupId != null and jobGroupId > 0">
+                AND t.job_group_id = #{jobGroupId}
+            </if>
+            <if test="targetName != null and targetName != ''">
+                AND t.target_name like CONCAT(CONCAT('%', #{targetName}), '%')
+            </if>
+        </trim>
+        ORDER BY t.operate_time DESC
+        LIMIT #{offset}, #{pagesize}
+    </select>
+
+    <select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
+        SELECT count(1)
+        FROM xxl_job_operation_log AS t
+        <trim prefix="WHERE" prefixOverrides="AND | OR">
+            <if test="module != null and module != ''">
+                AND t.module = #{module}
+            </if>
+            <if test="operationType != null and operationType != ''">
+                AND t.operation_type = #{operationType}
+            </if>
+            <if test="operator != null and operator != ''">
+                AND t.operator like CONCAT(CONCAT('%', #{operator}), '%')
+            </if>
+            <if test="operateTimeStart != null">
+                AND t.operate_time &gt;= #{operateTimeStart}
+            </if>
+            <if test="operateTimeEnd != null">
+                AND t.operate_time &lt;= #{operateTimeEnd}
+            </if>
+            <if test="jobGroupId != null and jobGroupId > 0">
+                AND t.job_group_id = #{jobGroupId}
+            </if>
+            <if test="targetName != null and targetName != ''">
+                AND t.target_name like CONCAT(CONCAT('%', #{targetName}), '%')
+            </if>
+        </trim>
+    </select>
+
+    <insert id="save" parameterType="com.xxl.job.admin.model.XxlJobOperationLog" useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO xxl_job_operation_log (
+        module,
+        operation_type,
+        operator,
+        operate_time,
+        ip,
+        target_id,
+        target_name,
+        job_group_id,
+        job_group_name
+        ) VALUES (
+        #{module},
+        #{operationType},
+        #{operator},
+        #{operateTime},
+        #{ip},
+        #{targetId},
+        #{targetName},
+        #{jobGroupId},
+        #{jobGroupName}
+        );
+    </insert>
+
+    <delete id="delete" parameterType="java.util.HashMap">
+        DELETE
+        FROM xxl_job_operation_log
+        WHERE id IN
+        <foreach collection="logIds" item="logId" open="(" separator="," close=")">
+            #{logId}
+        </foreach>
+    </delete>
+
+    <delete id="clearLog" parameterType="java.util.HashMap">
+        DELETE
+        FROM xxl_job_operation_log
+        WHERE operate_time &lt;= #{clearBeforeTime}
+    </delete>
+
+</mapper>

@@ -181,4 +181,26 @@ VALUES (1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923ad
 INSERT INTO `xxl_job_lock` (`lock_name`)
 VALUES ('schedule_lock');
 
+## —————————————————————— operation log ——————————————————
+
+CREATE TABLE `xxl_job_operation_log`
+(
+    `id`             bigint(20)   NOT NULL AUTO_INCREMENT,
+    `module`         varchar(50)  NOT NULL COMMENT '操作模块：LOGIN-登录、USER-用户管理、JOBGROUP-执行器管理、JOBINFO-任务管理',
+    `operation_type` varchar(50)  NOT NULL COMMENT '操作类型：新增/编辑/删除/启动/停止/登录',
+    `operator`       varchar(50)  NOT NULL COMMENT '操作人账号',
+    `operate_time`   datetime     NOT NULL COMMENT '操作时间',
+    `ip`             varchar(50)  DEFAULT NULL COMMENT '操作IP地址',
+    `target_id`      int(11)      DEFAULT NULL COMMENT '被操作对象ID',
+    `target_name`    varchar(255) DEFAULT NULL COMMENT '被操作对象名称（用户账号/执行器名称/任务描述）',
+    `job_group_id`   int(11)      DEFAULT NULL COMMENT '执行器ID（任务管理时关联）',
+    `job_group_name` varchar(128) DEFAULT NULL COMMENT '执行器名称（任务管理时关联）',
+    PRIMARY KEY (`id`),
+    KEY `I_module` (`module`),
+    KEY `I_operator` (`operator`),
+    KEY `I_operate_time` (`operate_time`),
+    KEY `I_job_group_id` (`job_group_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
+
 commit;

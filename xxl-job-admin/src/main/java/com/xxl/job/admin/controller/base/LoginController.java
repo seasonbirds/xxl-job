@@ -1,5 +1,8 @@
 package com.xxl.job.admin.controller.base;
 
+import com.xxl.job.admin.annotation.OperationLog;
+import com.xxl.job.admin.constant.OperationModule;
+import com.xxl.job.admin.constant.OperationType;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.util.I18nUtil;
@@ -48,6 +51,7 @@ public class LoginController {
 	@RequestMapping(value="/doLogin", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OperationLog(module = OperationModule.LOGIN, operationType = OperationType.LOGIN)
 	public Response<String> doLogin(HttpServletRequest request, HttpServletResponse response, String userName, String password, String ifRemember){
 
 		// param
