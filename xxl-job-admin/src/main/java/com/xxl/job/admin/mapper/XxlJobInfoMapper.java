@@ -61,5 +61,12 @@ public interface XxlJobInfoMapper {
 	 */
 	public int scheduleUpdate(XxlJobInfo xxlJobInfo);
 
+	/**
+	 * 批量查询任务信息
+	 * @param ids 任务ID列表
+	 * @return 任务信息列表
+	 */
+	List<XxlJobInfo> loadByIds(@Param("ids") List<Integer> ids);
+
 
 }

@@ -9,6 +9,7 @@ import com.xxl.job.admin.model.XxlJobLog;
 import com.xxl.job.admin.scheduler.config.XxlJobAdminBootstrap;
 import com.xxl.job.admin.scheduler.exception.XxlJobException;
 import com.xxl.job.admin.service.XxlJobService;
+import com.xxl.job.admin.util.ExcelExportUtil;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.job.admin.util.JobGroupPermissionUtil;
 import com.xxl.job.core.context.XxlJobContext;
@@ -23,9 +24,11 @@ import com.xxl.tool.response.PageModel;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.util.HtmlUtils;
 
+import java.io.IOException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +59,11 @@ public class JobLogController {
 	public XxlJobLogMapper xxlJobLogMapper;
     @Autowired
     private XxlJobService xxlJobService;
+    @Resource
+    private ExcelExportUtil excelExportUtil;
+
+    @Value("${xxl.job.log.export.max-data:2000000}")
+    private int maxExportData;
 
 	@RequestMapping
 	public String index(HttpServletRequest request,
@@ -330,6 +339,88 @@ public class JobLogController {
 		} catch (Exception e) {
 			logger.error("logId({}) logDetailCat error: {}", logId, e.getMessage(), e);
 			return Response.ofFail(e.getMessage());
+		}
+	}
+
+	/**
+	 * 导出日志到Excel
+	 */
+	@RequestMapping("/exportLog")
+	@ResponseBody
+	public void exportLog(HttpServletRequest request,
+						  HttpServletResponse response,
+						  @RequestParam int jobGroup,
+						  @RequestParam int jobId,
+						  @RequestParam int logStatus,
+						  @RequestParam String filterTime) {
+
+		try {
+			// valid jobGroup permission
+			JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
+
+			// valid jobId
+			if (jobId < 1) {
+				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				response.getWriter().write(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_job"));
+				return;
+			}
+
+			// parse param
+			Date triggerTimeStart = null;
+			Date triggerTimeEnd = null;
+			if (StringTool.isNotBlank(filterTime)) {
+				String[] temp = filterTime.split(" - ");
+				if (temp.length == 2) {
+					triggerTimeStart = DateTool.parseDateTime(temp[0]);
+					triggerTimeEnd = DateTool.parseDateTime(temp[1]);
+				}
+			}
+
+			// 验证时间范围不超过一年
+			if (triggerTimeStart != null && triggerTimeEnd != null) {
+				long diff = triggerTimeEnd.getTime() - triggerTimeStart.getTime();
+				long oneYearInMillis = 365L * 24 * 60 * 60 * 1000;
+				if (diff > oneYearInMillis) {
+					response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+					response.getWriter().write(I18nUtil.getString("joblog_export_time_range_too_long"));
+					return;
+				}
+			}
+
+			// 验证数据量不超过200万
+			int totalCount = xxlJobLogMapper.pageListCount(0, 1, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus);
+			if (totalCount > maxExportData) {
+				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				response.getWriter().write(I18nUtil.getString("joblog_export_data_too_large"));
+				return;
+			}
+
+			// 获取执行器名称和任务名称
+			XxlJobGroup jobGroupInfo = xxlJobGroupMapper.load(jobGroup);
+			XxlJobInfo jobInfo = xxlJobInfoMapper.loadById(jobId);
+			String executorName = jobGroupInfo != null ? jobGroupInfo.getTitle() : "unknown";
+			String taskName = jobInfo != null ? jobInfo.getJobDesc() : "unknown";
+
+			// 生成文件名
+			String fileName = String.format("%s-%s-%s.xlsx",
+					executorName,
+					taskName,
+					DateTool.formatDateTime(new Date(), "yyyyMMddHHmmss"));
+
+			// 查询所有日志数据
+			List<XxlJobLog> logs = xxlJobLogMapper.pageList(0, totalCount, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus);
+
+			// 使用EasyExcel导出
+			excelExportUtil.exportJobLogs(response, fileName, logs);
+
+		} catch (Exception e) {
+			logger.error("export log error: {}", e.getMessage(), e);
+			try {
+				response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				response.getWriter().write(I18nUtil.getString("system_opt_fail") + ": " + e.getMessage());
+			} catch (IOException ex) {
+				logger.error("response error: {}", ex.getMessage(), ex);
+			}
 		}
 	}
 
