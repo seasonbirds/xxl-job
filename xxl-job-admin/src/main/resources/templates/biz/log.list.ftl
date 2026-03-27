@@ -86,6 +86,8 @@
 						<button class="btn btn-sm btn-danger selectAny clearLog" type="button">${I18n.joblog_clean_log}</button>
 						｜
 						<button class="btn btn-sm btn-primary selectOnlyOne logDetail" type="button"><#--<i class="fa fa-edit"></i>-->${I18n.joblog_rolling_log}</button>
+						｜
+						<button class="btn btn-sm btn-success exportLog" type="button">${I18n.joblog_export_log}</button>
 					</div>
 					<div class="box-body" >
 						<table id="data_list" class="table table-bordered table-striped" width="100%" >
@@ -475,6 +477,100 @@
 		});
 		$("#clearLogModal").on('hide.bs.modal', function () {
 			$("#clearLogModal .form")[0].reset();
+		});
+
+		/**
+		 * export Log
+		 */
+		$('#data_operation').on('click', '.exportLog', function(){
+			var $btn = $(this);
+			
+			// 检查按钮是否已经在导出中
+			if ($btn.prop('disabled')) {
+				return;
+			}
+			
+			// 验证时间范围（不超过一年）
+			var filterTime = $('#filterTime').val();
+			if (filterTime) {
+				var times = filterTime.split(' - ');
+				var startTime = moment(times[0], "YYYY-MM-DD HH:mm:ss");
+				var endTime = moment(times[1], "YYYY-MM-DD HH:mm:ss");
+				var diffDays = endTime.diff(startTime, 'days');
+				
+				if (diffDays > 365) {
+					layer.msg(I18n.joblog_export_time_range_too_long);
+					return;
+				}
+			}
+			
+			// 禁用按钮，防止重复点击
+			$btn.prop('disabled', true).text('导出中...');
+			
+			// 构建导出请求参数
+			var params = {
+				jobGroup: $('#jobGroup').val(),
+				jobId: $('#jobId').val(),
+				logStatus: $('#logStatus').val(),
+				filterTime: $('#filterTime').val()
+			};
+			
+			// 发起导出请求
+			$.ajax({
+				type: 'GET',
+				url: base_url + '/joblog/exportLog',
+				data: params,
+				xhrFields: {
+					responseType: 'blob'
+				},
+				success: function(data, status, xhr) {
+					// 从响应头获取文件名
+					var contentDisposition = xhr.getResponseHeader('Content-Disposition');
+					var filename = 'joblog-export.xlsx';
+					if (contentDisposition) {
+						var filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+						if (filenameMatch && filenameMatch[1]) {
+							filename = decodeURIComponent(filenameMatch[1]);
+						} else {
+							filenameMatch = contentDisposition.match(/filename="(.+)"/);
+							if (filenameMatch && filenameMatch[1]) {
+								filename = filenameMatch[1];
+							}
+						}
+					}
+					
+					// 创建下载链接
+					var blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+					var downloadUrl = URL.createObjectURL(blob);
+					var a = document.createElement('a');
+					a.href = downloadUrl;
+					a.download = filename;
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(downloadUrl);
+					
+					layer.msg("导出成功");
+				},
+				error: function(xhr) {
+					// 处理错误响应
+					if (xhr.status === 400) {
+						// 读取错误信息
+						var reader = new FileReader();
+						reader.onload = function() {
+							var errorMsg = reader.result;
+							layer.msg(errorMsg || "导出失败，请稍后重试");
+						};
+						reader.readAsText(xhr.response);
+					} else {
+						layer.msg("导出失败，请稍后重试");
+					}
+				},
+				complete: function() {
+					// 恢复按钮状态
+					$btn.prop('disabled', false).text('导出日志');
+				}
+			});
 		});
 
 		// ---------------------- ComAlertTec ----------------------
