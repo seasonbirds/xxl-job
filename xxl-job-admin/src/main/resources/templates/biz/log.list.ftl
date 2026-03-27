@@ -86,6 +86,8 @@
 						<button class="btn btn-sm btn-danger selectAny clearLog" type="button">${I18n.joblog_clean_log}</button>
 						｜
 						<button class="btn btn-sm btn-primary selectOnlyOne logDetail" type="button"><#--<i class="fa fa-edit"></i>-->${I18n.joblog_rolling_log}</button>
+						｜
+						<button class="btn btn-sm btn-success exportLog" type="button">${I18n.joblog_export}</button>
 					</div>
 					<div class="box-body" >
 						<table id="data_list" class="table table-bordered table-striped" width="100%" >
@@ -475,6 +477,141 @@
 		});
 		$("#clearLogModal").on('hide.bs.modal', function () {
 			$("#clearLogModal .form")[0].reset();
+		});
+
+		// ---------------------- exportLog ----------------------
+	/**
+	 * 导出调度日志功能
+	 * 实现逻辑：
+	 * 1. 防止重复导出
+	 * 2. 验证必填参数（任务、时间范围）
+	 * 3. 验证时间范围格式和最大限制
+	 * 4. 发送AJAX请求导出Excel
+	 * 5. 处理导出结果并下载文件
+	 */
+	var isExporting = false;
+	var maxTimeRange = 365 * 24 * 60 * 60 * 1000; // 最大导出时间范围：1年
+
+	/**
+	 * 导出按钮点击事件处理
+	 */
+	$('#data_operation').on('click', '.exportLog', function(){
+			if (isExporting) {
+				layer.msg(I18n.joblog_export_loading);
+				return;
+			}
+
+			// 获取导出参数
+		var jobGroup = $('#jobGroup').val();
+		var jobId = $('#jobId').val();
+		var logStatus = $('#logStatus').val();
+		var filterTime = $('#filterTime').val();
+
+		// 验证任务选择
+		if (jobId < 1) {
+			layer.msg(I18n.joblog_export_please_select_job);
+			return;
+		}
+
+		// 验证时间范围
+		if (!filterTime || filterTime.trim() === '') {
+			layer.msg(I18n.joblog_export_please_select_time_range);
+			return;
+		}
+
+		// 解析时间范围格式
+		var timeRange = filterTime.split(' - ');
+		if (timeRange.length !== 2) {
+			layer.msg(I18n.joblog_export_time_format_error);
+			return;
+		}
+
+		// 验证时间范围是否在最大限制内
+		var startTime = moment(timeRange[0], 'YYYY-MM-DD HH:mm:ss');
+		var endTime = moment(timeRange[1], 'YYYY-MM-DD HH:mm:ss');
+		var timeDiff = endTime.diff(startTime);
+
+		if (timeDiff > maxTimeRange) {
+			layer.msg(I18n.joblog_export_time_range_limit);
+			return;
+		}
+
+		// 设置导出状态，防止重复点击
+		isExporting = true;
+		$('.exportLog').attr('disabled', true).text(I18n.joblog_export_exporting);
+
+		// 发送导出请求
+		$.ajax({
+				type: 'POST',
+				url: base_url + '/joblog/exportLog',
+				data: {
+					jobGroup: jobGroup,
+					jobId: jobId,
+					logStatus: logStatus,
+					filterTime: filterTime
+				},
+				xhrFields: {
+					responseType: 'blob'
+				},
+				/**
+		 * 请求成功回调
+		 * 根据响应内容类型处理不同的结果：
+		 * - JSON响应：表示导出失败，显示错误信息
+		 * - 其他响应：表示导出成功，下载Excel文件
+		 */
+		success: function(data, status, xhr) {
+			var contentType = xhr.getResponseHeader('Content-Type');
+			// 如果是JSON响应，说明导出失败，显示错误信息
+			if (contentType && contentType.indexOf('application/json') !== -1) {
+				var reader = new FileReader();
+				reader.onload = function() {
+					var result = JSON.parse(reader.result);
+					layer.msg(result.msg || I18n.joblog_export_failed);
+				};
+				reader.readAsText(data);
+			} else {
+				// 解析文件名，优先从响应头获取
+				var filename = '';
+				var disposition = xhr.getResponseHeader('Content-Disposition');
+				if (disposition) {
+					var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+					var matches = filenameRegex.exec(disposition);
+					if (matches != null && matches[1]) {
+						filename = matches[1].replace(/['"]/g, '');
+					}
+				}
+				// 使用默认文件名
+				if (!filename) {
+					filename = 'joblog_export.xlsx';
+				}
+
+				// 创建Blob对象并触发下载
+				var blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+				var link = document.createElement('a');
+				link.href = window.URL.createObjectURL(blob);
+				link.download = filename;
+				link.click();
+				window.URL.revokeObjectURL(link.href);
+
+				layer.msg(I18n.joblog_export_success);
+			}
+		},
+		/**
+		 * 请求失败回调
+		 * 显示错误提示信息
+		 */
+		error: function(xhr, status, error) {
+			layer.msg(I18n.joblog_export_failed_retry);
+		},
+		/**
+		 * 请求完成回调（无论成功或失败都会执行）
+		 * 重置导出状态和按钮文本
+		 */
+		complete: function() {
+			isExporting = false;
+			$('.exportLog').attr('disabled', false).text(I18n.joblog_export);
+		}
+			});
 		});
 
 		// ---------------------- ComAlertTec ----------------------

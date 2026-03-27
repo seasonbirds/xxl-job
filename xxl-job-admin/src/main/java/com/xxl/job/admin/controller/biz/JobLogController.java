@@ -1,5 +1,8 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.write.metadata.WriteSheet;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.mapper.XxlJobInfoMapper;
 import com.xxl.job.admin.mapper.XxlJobLogMapper;
@@ -23,6 +26,7 @@ import com.xxl.tool.response.PageModel;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,10 +37,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.util.HtmlUtils;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * index controller
@@ -330,6 +341,154 @@ public class JobLogController {
 		} catch (Exception e) {
 			logger.error("logId({}) logDetailCat error: {}", logId, e.getMessage(), e);
 			return Response.ofFail(e.getMessage());
+		}
+	}
+
+	/**
+	 * 导出调度日志
+	 *
+	 * @param request HttpServletRequest对象
+	 * @param response HttpServletResponse对象
+	 * @param jobGroup 执行器ID
+	 * @param jobId 任务ID
+	 * @param logStatus 日志状态
+	 * @param filterTime 时间范围过滤条件
+	 */
+	@RequestMapping("/exportLog")
+	public void exportLog(HttpServletRequest request,
+						  HttpServletResponse response,
+						  @RequestParam int jobGroup,
+						  @RequestParam int jobId,
+						  @RequestParam int logStatus,
+						  @RequestParam String filterTime) {
+
+		JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
+
+		if (jobId < 1) {
+			writeErrorResponse(response, I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_job"));
+			return;
+		}
+
+		Date triggerTimeStart = null;
+		Date triggerTimeEnd = null;
+		if (StringTool.isNotBlank(filterTime)) {
+			String[] temp = filterTime.split(" - ");
+			if (temp.length == 2) {
+				triggerTimeStart = DateTool.parseDateTime(temp[0]);
+				triggerTimeEnd = DateTool.parseDateTime(temp[1]);
+			}
+		}
+
+		if (triggerTimeStart == null || triggerTimeEnd == null) {
+			writeErrorResponse(response, I18nUtil.getString("joblog_export_please_select_time_range"));
+			return;
+		}
+
+		long timeDiff = triggerTimeEnd.getTime() - triggerTimeStart.getTime();
+		if (timeDiff > TimeUnit.DAYS.toMillis(366)) {
+			writeErrorResponse(response, I18nUtil.getString("joblog_export_time_range_limit"));
+			return;
+		}
+
+		int totalCount = xxlJobLogMapper.pageListCount(0, 1, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus);
+		if (totalCount > 2000000) {
+			writeErrorResponse(response, I18nUtil.getString("joblog_export_data_size_limit"));
+			return;
+		}
+
+		XxlJobInfo jobInfo = xxlJobInfoMapper.loadById(jobId);
+		XxlJobGroup jobGroupObj = xxlJobGroupMapper.load(jobGroup);
+
+		String executorName = jobGroupObj != null ? jobGroupObj.getTitle() : I18nUtil.getString("system_empty");
+		String jobName = jobInfo != null ? jobInfo.getJobDesc() : I18nUtil.getString("system_empty");
+		String datetime = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+		String fileName = executorName + "-" + jobName + "-" + datetime + ".xlsx";
+
+		try {
+			response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+			response.setCharacterEncoding("utf-8");
+			response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20"));
+
+			OutputStream outputStream = response.getOutputStream();
+			
+			try (ExcelWriter excelWriter = EasyExcel.write(outputStream, JobLogExportDTO.class).build()) {
+				WriteSheet writeSheet = EasyExcel.writerSheet(I18nUtil.getString("joblog_name")).build();
+				
+				int pageSize = 1000;
+				int offset = 0;
+				
+				while (offset < totalCount) {
+					List<XxlJobLog> logList = xxlJobLogMapper.pageList(offset, pageSize, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus);
+					List<JobLogExportDTO> exportList = new ArrayList<>();
+					
+					for (XxlJobLog log : logList) {
+						JobLogExportDTO dto = new JobLogExportDTO();
+						dto.setId(log.getId());
+						
+						String jobShow = "【" + log.getJobId() + "】";
+						if (jobInfo != null) {
+							jobShow += jobInfo.getJobDesc();
+						}
+						if (jobShow.length() > 50) {
+							jobShow = jobShow.substring(0, 50) + "...";
+						}
+						dto.setJobName(jobShow);
+						
+						dto.setTriggerTime(log.getTriggerTime());
+						dto.setTriggerCode(convertTriggerCode(log.getTriggerCode()));
+						dto.setTriggerMsg(log.getTriggerMsg() != null ? log.getTriggerMsg() : "");
+						dto.setHandleTime(log.getHandleTime());
+						dto.setHandleCode(convertHandleCode(log.getHandleCode()));
+						dto.setHandleMsg(log.getHandleMsg() != null ? log.getHandleMsg() : "");
+						
+						exportList.add(dto);
+					}
+					
+					excelWriter.write(exportList, writeSheet);
+					offset += pageSize;
+				}
+			}
+
+			outputStream.flush();
+			outputStream.close();
+
+		} catch (Exception e) {
+			logger.error("Export log error", e);
+			writeErrorResponse(response, I18nUtil.getString("system_fail") + ": " + e.getMessage());
+		}
+	}
+
+	private String convertTriggerCode(int triggerCode) {
+		if (triggerCode == 200) {
+			return I18nUtil.getString("system_success");
+		} else if (triggerCode > 0) {
+			return I18nUtil.getString("system_fail");
+		} else if (triggerCode == 0) {
+			return "";
+		}
+		return String.valueOf(triggerCode);
+	}
+
+	private String convertHandleCode(int handleCode) {
+		if (handleCode == 200) {
+			return I18nUtil.getString("joblog_handleCode_200");
+		} else if (handleCode == 502) {
+			return I18nUtil.getString("joblog_handleCode_502");
+		} else if (handleCode > 0) {
+			return I18nUtil.getString("joblog_handleCode_500");
+		} else if (handleCode == 0) {
+			return "";
+		}
+		return String.valueOf(handleCode);
+	}
+
+	private void writeErrorResponse(HttpServletResponse response, String message) {
+		try {
+			response.setContentType("text/html;charset=utf-8");
+			response.getWriter().write(message);
+			response.getWriter().flush();
+		} catch (Exception e) {
+			logger.error("Write error response error", e);
 		}
 	}
 
