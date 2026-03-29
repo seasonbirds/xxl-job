@@ -1,5 +1,6 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.annotation.OperationLog;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobInfo;
@@ -98,6 +99,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/insert")
 	@ResponseBody
+	@OperationLog(module = "JOB", type = "ADD", description = "添加任务")
 	public Response<String> add(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -108,6 +110,7 @@ public class JobInfoController {
 
 	@RequestMapping("/update")
 	@ResponseBody
+	@OperationLog(module = "JOB", type = "UPDATE", description = "更新任务")
 	public Response<String> update(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -118,6 +121,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/delete")
 	@ResponseBody
+	@OperationLog(module = "JOB", type = "DELETE", description = "删除任务")
 	public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -132,6 +136,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/stop")
 	@ResponseBody
+	@OperationLog(module = "JOB", type = "STOP", description = "暂停任务")
 	public Response<String> pause(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -146,6 +151,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/start")
 	@ResponseBody
+	@OperationLog(module = "JOB", type = "START", description = "启动任务")
 	public Response<String> start(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -160,6 +166,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/trigger")
 	@ResponseBody
+	@OperationLog(module = "JOB", type = "TRIGGER", description = "触发任务")
 	public Response<String> triggerJob(HttpServletRequest request,
 									  @RequestParam("id") int id,
 									  @RequestParam("executorParam") String executorParam,

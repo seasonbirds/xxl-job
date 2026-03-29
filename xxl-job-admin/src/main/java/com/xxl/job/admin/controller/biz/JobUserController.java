@@ -1,6 +1,7 @@
 package com.xxl.job.admin.controller.biz;
 
 import com.xxl.job.admin.constant.Consts;
+import com.xxl.job.admin.annotation.OperationLog;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
@@ -79,6 +80,7 @@ public class JobUserController {
     @RequestMapping("/insert")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperationLog(module = "USER", type = "ADD", description = "添加用户")
     public Response<String> insert(XxlJobUser xxlJobUser) {
 
         // valid username
@@ -115,6 +117,7 @@ public class JobUserController {
     @RequestMapping("/update")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperationLog(module = "USER", type = "UPDATE", description = "更新用户")
     public Response<String> update(HttpServletRequest request, XxlJobUser xxlJobUser) {
 
         // avoid opt login seft
@@ -144,6 +147,7 @@ public class JobUserController {
     @RequestMapping("/delete")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperationLog(module = "USER", type = "DELETE", description = "删除用户")
     public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
         // valid
@@ -161,8 +165,10 @@ public class JobUserController {
         return Response.ofSuccess();
     }
 
-    /*@RequestMapping("/updatePwd")
+    @RequestMapping("/updatePwd")
     @ResponseBody
+    @XxlSso
+    @OperationLog(module = "USER", type = "UPDATE", description = "修改密码")
     public Response<String> updatePwd(HttpServletRequest request,
                                      @RequestParam("password") String password,
                                      @RequestParam("oldPassword") String oldPassword){
