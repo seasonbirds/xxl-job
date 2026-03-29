@@ -9,7 +9,9 @@ import com.xxl.job.admin.scheduler.route.ExecutorRouteStrategyEnum;
 import com.xxl.job.admin.scheduler.type.ScheduleTypeEnum;
 import com.xxl.job.admin.service.XxlJobService;
 import com.xxl.job.admin.util.I18nUtil;
-import com.xxl.job.admin.util.JobGroupPermissionUtil;
+import com.xxl.job.admin.aop.OperationLog;
+import com.xxl.job.admin.model.enums.OperationModule;
+import com.xxl.job.admin.model.enums.OperationType;
 import com.xxl.job.core.constant.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.sso.core.helper.XxlSsoHelper;
@@ -98,6 +100,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/insert")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOB_INFO, type = OperationType.ADD)
 	public Response<String> add(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -108,6 +111,7 @@ public class JobInfoController {
 
 	@RequestMapping("/update")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOB_INFO, type = OperationType.EDIT)
 	public Response<String> update(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -118,6 +122,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/delete")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOB_INFO, type = OperationType.DELETE)
 	public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -132,6 +137,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/stop")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOB_INFO, type = OperationType.STOP)
 	public Response<String> pause(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -146,6 +152,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/start")
 	@ResponseBody
+	@OperationLog(module = OperationModule.JOB_INFO, type = OperationType.START)
 	public Response<String> start(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid

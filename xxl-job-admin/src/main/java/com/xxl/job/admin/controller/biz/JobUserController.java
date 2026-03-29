@@ -1,8 +1,11 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.aop.OperationLog;
 import com.xxl.job.admin.constant.Consts;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
+import com.xxl.job.admin.model.enums.OperationModule;
+import com.xxl.job.admin.model.enums.OperationType;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.util.I18nUtil;
@@ -79,6 +82,7 @@ public class JobUserController {
     @RequestMapping("/insert")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperationLog(module = OperationModule.USER_MANAGEMENT, type = OperationType.ADD)
     public Response<String> insert(XxlJobUser xxlJobUser) {
 
         // valid username
@@ -115,6 +119,7 @@ public class JobUserController {
     @RequestMapping("/update")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperationLog(module = OperationModule.USER_MANAGEMENT, type = OperationType.EDIT)
     public Response<String> update(HttpServletRequest request, XxlJobUser xxlJobUser) {
 
         // avoid opt login seft
@@ -144,6 +149,7 @@ public class JobUserController {
     @RequestMapping("/delete")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperationLog(module = OperationModule.USER_MANAGEMENT, type = OperationType.DELETE)
     public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
         // valid

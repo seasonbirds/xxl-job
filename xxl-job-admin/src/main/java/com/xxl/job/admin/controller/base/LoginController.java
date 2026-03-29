@@ -1,7 +1,10 @@
 package com.xxl.job.admin.controller.base;
 
+import com.xxl.job.admin.aop.OperationLog;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobUser;
+import com.xxl.job.admin.model.enums.OperationModule;
+import com.xxl.job.admin.model.enums.OperationType;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.sso.core.annotation.XxlSso;
 import com.xxl.sso.core.helper.XxlSsoHelper;
@@ -48,6 +51,7 @@ public class LoginController {
 	@RequestMapping(value="/doLogin", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OperationLog(module = OperationModule.LOGIN, type = OperationType.LOGIN)
 	public Response<String> doLogin(HttpServletRequest request, HttpServletResponse response, String userName, String password, String ifRemember){
 
 		// param
@@ -78,6 +82,7 @@ public class LoginController {
 	@RequestMapping(value="/logout", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OperationLog(module = OperationModule.LOGIN, type = OperationType.LOGOUT)
 	public Response<String> logout(HttpServletRequest request, HttpServletResponse response){
 
 		// xxl-sso, do logout
