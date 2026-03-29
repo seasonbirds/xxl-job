@@ -1,6 +1,7 @@
 package com.xxl.job.admin.controller.biz;
 
 import com.xxl.job.admin.constant.Consts;
+import com.xxl.job.admin.annotation.OperationLog;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobRegistry;
 import com.xxl.job.admin.util.I18nUtil;
@@ -68,6 +69,7 @@ public class JobGroupController {
 	@RequestMapping("/insert")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
+	@OperationLog(module = "EXECUTOR", type = "ADD", description = "添加执行器")
 	public Response<String> insert(XxlJobGroup xxlJobGroup){
 
 		// valid
@@ -115,6 +117,7 @@ public class JobGroupController {
 	@RequestMapping("/update")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
+	@OperationLog(module = "EXECUTOR", type = "UPDATE", description = "更新执行器")
 	public Response<String> update(XxlJobGroup xxlJobGroup){
 		// valid
 		if (StringTool.isBlank(xxlJobGroup.getAppname())) {
@@ -181,6 +184,7 @@ public class JobGroupController {
 	@RequestMapping("/delete")
 	@ResponseBody
 	@XxlSso(role = Consts.ADMIN_ROLE)
+	@OperationLog(module = "EXECUTOR", type = "DELETE", description = "删除执行器")
 	public Response<String> delete(@RequestParam("ids[]") List<Integer> ids){
 
 		// parse id
