@@ -219,17 +219,6 @@
 			endDate: rangesConf[I18n.daterangepicker_ranges_today][1]*/
 		});
 
-		$('#filterTime').on('apply.daterangepicker', function(ev, picker) {
-			var startDate = picker.startDate;
-			var endDate = picker.endDate;
-			var diffDays = endDate.diff(startDate, 'days');
-			if (diffDays > 366) {
-				layer.msg(I18n.joblog_export_timerange_limit);
-				picker.setStartDate(rangesConf[I18n.daterangepicker_ranges_recent_week][0]);
-				picker.setEndDate(rangesConf[I18n.daterangepicker_ranges_recent_week][1]);
-			}
-		});
-
 		// init filter
 		var jobGroup = '${jobGroup}';
 		var jobId = '${jobId}';
@@ -553,10 +542,14 @@
 							var contentDisposition = xhr.getResponseHeader('Content-Disposition');
 							var fileName = 'joblog.xlsx';
 							if (contentDisposition) {
-								var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-								var matches = filenameRegex.exec(contentDisposition);
-								if (matches != null && matches[1]) {
-									fileName = decodeURIComponent(matches[1].replace(/['"]/g, ''));
+								var filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+								if (filenameMatch && filenameMatch[1]) {
+									fileName = filenameMatch[1];
+								} else {
+									var filenameStarMatch = contentDisposition.match(/filename\*=utf-8''([^;]+)/i);
+									if (filenameStarMatch && filenameStarMatch[1]) {
+										fileName = decodeURIComponent(filenameStarMatch[1]);
+									}
 								}
 							}
 
