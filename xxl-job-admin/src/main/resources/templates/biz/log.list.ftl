@@ -86,6 +86,8 @@
 						<button class="btn btn-sm btn-danger selectAny clearLog" type="button">${I18n.joblog_clean_log}</button>
 						｜
 						<button class="btn btn-sm btn-primary selectOnlyOne logDetail" type="button"><#--<i class="fa fa-edit"></i>-->${I18n.joblog_rolling_log}</button>
+						｜
+						<button class="btn btn-sm btn-success exportLog" type="button">${I18n.joblog_export}</button>
 					</div>
 					<div class="box-body" >
 						<table id="data_list" class="table table-bordered table-striped" width="100%" >
@@ -215,6 +217,17 @@
 			}/*,
 			startDate: rangesConf[I18n.daterangepicker_ranges_today][0],
 			endDate: rangesConf[I18n.daterangepicker_ranges_today][1]*/
+		});
+
+		$('#filterTime').on('apply.daterangepicker', function(ev, picker) {
+			var startDate = picker.startDate;
+			var endDate = picker.endDate;
+			var diffDays = endDate.diff(startDate, 'days');
+			if (diffDays > 366) {
+				layer.msg(I18n.joblog_export_timerange_limit);
+				picker.setStartDate(rangesConf[I18n.daterangepicker_ranges_recent_week][0]);
+				picker.setEndDate(rangesConf[I18n.daterangepicker_ranges_recent_week][1]);
+			}
 		});
 
 		// init filter
@@ -475,6 +488,115 @@
 		});
 		$("#clearLogModal").on('hide.bs.modal', function () {
 			$("#clearLogModal .form")[0].reset();
+		});
+
+		/**
+		 * export Log
+		 */
+		$('#data_operation').on('click', '.exportLog', function(){
+			var jobGroup = $('#jobGroup').val();
+			var jobId = $('#jobId').val();
+			var logStatus = $('#logStatus').val();
+			var filterTime = $('#filterTime').val();
+
+			if (jobId < 1) {
+				layer.msg(I18n.system_please_choose + I18n.jobinfo_job);
+				return;
+			}
+
+			if (filterTime) {
+				var timeArr = filterTime.split(' - ');
+				if (timeArr.length == 2) {
+					var startDate = moment(timeArr[0]);
+					var endDate = moment(timeArr[1]);
+					var diffDays = endDate.diff(startDate, 'days');
+					if (diffDays > 366) {
+						layer.msg(I18n.joblog_export_timerange_limit);
+						return;
+					}
+				}
+			}
+
+			layer.confirm(I18n.joblog_export_confirm, {
+				icon: 3,
+				title: I18n.system_tips,
+				btn: [I18n.system_ok, I18n.system_cancel]
+			}, function(index){
+				layer.close(index);
+
+				var exportUrl = base_url + '/joblog/exportLog?jobGroup=' + encodeURIComponent(jobGroup)
+					+ '&jobId=' + encodeURIComponent(jobId)
+					+ '&logStatus=' + encodeURIComponent(logStatus)
+					+ '&filterTime=' + encodeURIComponent(filterTime);
+
+				$.ajax({
+					type: 'GET',
+					url: exportUrl,
+					xhrFields: {
+						responseType: 'blob'
+					},
+					success: function(data, status, xhr) {
+						var contentType = xhr.getResponseHeader('Content-Type');
+						if (contentType && contentType.indexOf('application/json') !== -1) {
+							var reader = new FileReader();
+							reader.onload = function() {
+								var result = JSON.parse(this.result);
+								layer.open({
+									title: I18n.system_tips,
+									btn: [I18n.system_ok],
+									content: result.msg || I18n.system_opt_fail,
+									icon: '2'
+								});
+							};
+							reader.readAsText(data);
+						} else {
+							var contentDisposition = xhr.getResponseHeader('Content-Disposition');
+							var fileName = 'joblog.xlsx';
+							if (contentDisposition) {
+								var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+								var matches = filenameRegex.exec(contentDisposition);
+								if (matches != null && matches[1]) {
+									fileName = decodeURIComponent(matches[1].replace(/['"]/g, ''));
+								}
+							}
+
+							var blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+							var link = document.createElement('a');
+							link.href = window.URL.createObjectURL(blob);
+							link.download = fileName;
+							link.click();
+							window.URL.revokeObjectURL(link.href);
+
+							layer.open({
+								title: I18n.system_tips,
+								btn: [I18n.system_ok],
+								content: I18n.system_opt_suc,
+								icon: '1'
+							});
+						}
+					},
+					error: function(xhr) {
+						var errorMsg = I18n.system_opt_fail;
+						if (xhr.responseJSON && xhr.responseJSON.msg) {
+							errorMsg = xhr.responseJSON.msg;
+						} else if (xhr.responseText) {
+							try {
+								var resp = JSON.parse(xhr.responseText);
+								if (resp.msg) {
+									errorMsg = resp.msg;
+								}
+							} catch (e) {
+							}
+						}
+						layer.open({
+							title: I18n.system_tips,
+							btn: [I18n.system_ok],
+							content: errorMsg,
+							icon: '2'
+						});
+					}
+				});
+			});
 		});
 
 		// ---------------------- ComAlertTec ----------------------
