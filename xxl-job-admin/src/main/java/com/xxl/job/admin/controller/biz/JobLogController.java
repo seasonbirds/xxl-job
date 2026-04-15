@@ -8,6 +8,7 @@ import com.xxl.job.admin.model.XxlJobInfo;
 import com.xxl.job.admin.model.XxlJobLog;
 import com.xxl.job.admin.scheduler.config.XxlJobAdminBootstrap;
 import com.xxl.job.admin.scheduler.exception.XxlJobException;
+import com.xxl.job.admin.service.JobLogExportService;
 import com.xxl.job.admin.service.XxlJobService;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.job.admin.util.JobGroupPermissionUtil;
@@ -23,6 +24,7 @@ import com.xxl.tool.response.PageModel;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +57,8 @@ public class JobLogController {
 	public XxlJobLogMapper xxlJobLogMapper;
     @Autowired
     private XxlJobService xxlJobService;
+	@Resource
+	private JobLogExportService jobLogExportService;
 
 	@RequestMapping
 	public String index(HttpServletRequest request,
@@ -330,6 +334,43 @@ public class JobLogController {
 		} catch (Exception e) {
 			logger.error("logId({}) logDetailCat error: {}", logId, e.getMessage(), e);
 			return Response.ofFail(e.getMessage());
+		}
+	}
+
+	@RequestMapping("/exportLog")
+	public void exportLog(HttpServletRequest request,
+						  HttpServletResponse response,
+						  @RequestParam int jobGroup,
+						  @RequestParam int jobId,
+						  @RequestParam int logStatus,
+						  @RequestParam String filterTime) {
+		try {
+			JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
+
+			if (jobId < 1) {
+				throw new RuntimeException(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_job"));
+			}
+
+			Date triggerTimeStart = null;
+			Date triggerTimeEnd = null;
+			if (StringTool.isNotBlank(filterTime)) {
+				String[] temp = filterTime.split(" - ");
+				if (temp.length == 2) {
+					triggerTimeStart = DateTool.parseDateTime(temp[0]);
+					triggerTimeEnd = DateTool.parseDateTime(temp[1]);
+				}
+			}
+
+			jobLogExportService.exportLog(response, jobGroup, jobId, logStatus, triggerTimeStart, triggerTimeEnd);
+		} catch (Exception e) {
+			logger.error("export log error: {}", e.getMessage(), e);
+			try {
+				response.reset();
+				response.setContentType("application/json;charset=UTF-8");
+				response.getWriter().write("{\"code\":500,\"msg\":\"" + (e.getMessage() != null ? e.getMessage() : I18nUtil.getString("system_fail")) + "\"}");
+			} catch (Exception ex) {
+				logger.error("handle export error response failed: {}", ex.getMessage());
+			}
 		}
 	}
 
