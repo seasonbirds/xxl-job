@@ -9,9 +9,11 @@ import com.xxl.job.admin.model.XxlJobInfo;
 import com.xxl.job.admin.model.XxlJobOperateLog;
 import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.service.XxlJobOperateLogService;
+import com.xxl.job.admin.util.HttpUtil;
 import com.xxl.sso.core.helper.XxlSsoHelper;
 import com.xxl.sso.core.model.LoginInfo;
 import com.xxl.tool.core.StringTool;
+import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -26,6 +28,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.reflect.Method;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 操作日志切面
@@ -51,7 +54,24 @@ public class OperateLogAspect {
 
     @Around("@annotation(com.xxl.job.admin.core.annotation.OperateLog)")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
-        long startTime = System.currentTimeMillis();
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Method method = signature.getMethod();
+        OperateLog operateLog = method.getAnnotation(OperateLog.class);
+
+        if (operateLog == null) {
+            return joinPoint.proceed();
+        }
+
+        String module = operateLog.module();
+        boolean isLoginModule = XxlJobOperateLog.Module.LOGIN.getCode().equals(module);
+        String logoutAction = XxlJobOperateLog.Action.LOGOUT.getCode();
+        boolean isLogoutAction = logoutAction.equals(operateLog.action());
+
+        String operatorBeforeLogout = null;
+        if (isLoginModule && isLogoutAction) {
+            operatorBeforeLogout = getCurrentOperator();
+        }
+
         Object result = null;
         Throwable throwable = null;
 
@@ -63,22 +83,48 @@ public class OperateLogAspect {
             throw t;
         } finally {
             try {
-                saveOperateLog(joinPoint, result, throwable);
+                if (shouldSaveLog(operateLog, result, throwable)) {
+                    saveOperateLog(joinPoint, result, throwable, operateLog, operatorBeforeLogout);
+                }
             } catch (Exception e) {
                 logger.error("OperateLogAspect save log error: {}", e.getMessage(), e);
             }
         }
     }
 
-    private void saveOperateLog(ProceedingJoinPoint joinPoint, Object result, Throwable throwable) {
-        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        Method method = signature.getMethod();
-        OperateLog operateLog = method.getAnnotation(OperateLog.class);
-
-        if (operateLog == null) {
-            return;
+    private boolean shouldSaveLog(OperateLog operateLog, Object result, Throwable throwable) {
+        if (throwable != null) {
+            return false;
         }
 
+        String module = operateLog.module();
+        if (XxlJobOperateLog.Module.LOGIN.getCode().equals(module)) {
+            if (result instanceof Response<?>) {
+                return ((Response<?>) result).isSuccess();
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    private String getCurrentOperator() {
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        if (request != null) {
+            try {
+                LoginInfo loginInfo = XxlSsoHelper.loginCheckWithAttr(request).getData();
+                if (loginInfo != null && StringTool.isNotBlank(loginInfo.getUserName())) {
+                    return loginInfo.getUserName();
+                }
+            } catch (Exception e) {
+                logger.debug("Get login user info error: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private void saveOperateLog(ProceedingJoinPoint joinPoint, Object result, Throwable throwable,
+                                 OperateLog operateLog, String operatorBeforeLogout) {
         XxlJobOperateLog log = new XxlJobOperateLog();
         log.setModule(operateLog.module());
         log.setAction(operateLog.action());
@@ -86,14 +132,15 @@ public class OperateLogAspect {
 
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
         if (request != null) {
-            log.setIp(getClientIp(request));
-            try {
-                LoginInfo loginInfo = XxlSsoHelper.loginCheckWithAttr(request).getData();
-                if (loginInfo != null && StringTool.isNotBlank(loginInfo.getUserName())) {
-                    log.setOperator(loginInfo.getUserName());
-                }
-            } catch (Exception e) {
-                logger.debug("Get login user info error: {}", e.getMessage());
+            log.setIp(HttpUtil.getClientIp(request));
+        }
+
+        if (operatorBeforeLogout != null) {
+            log.setOperator(operatorBeforeLogout);
+        } else {
+            String currentOperator = getCurrentOperator();
+            if (currentOperator != null) {
+                log.setOperator(currentOperator);
             }
         }
 
@@ -111,11 +158,14 @@ public class OperateLogAspect {
         Object[] args = joinPoint.getArgs();
 
         if (XxlJobOperateLog.Module.LOGIN.getCode().equals(module)) {
-            if (args != null && args.length > 0) {
+            if (args != null && args.length > 0 && log.getOperator() == null) {
                 for (Object arg : args) {
-                    if (arg instanceof String && log.getOperator() == null) {
-                        log.setOperator((String) arg);
-                        break;
+                    if (arg instanceof String) {
+                        String strArg = (String) arg;
+                        if (StringTool.isNotBlank(strArg) && strArg.length() >= 4) {
+                            log.setOperator(strArg);
+                            break;
+                        }
                     }
                 }
             }
@@ -215,28 +265,5 @@ public class OperateLogAspect {
             }
             return;
         }
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_CLIENT_IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 }

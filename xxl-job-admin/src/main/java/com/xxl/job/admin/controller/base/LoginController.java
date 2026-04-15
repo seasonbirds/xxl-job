@@ -2,9 +2,7 @@ package com.xxl.job.admin.controller.base;
 
 import com.xxl.job.admin.core.annotation.OperateLog;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
-import com.xxl.job.admin.model.XxlJobOperateLog;
 import com.xxl.job.admin.model.XxlJobUser;
-import com.xxl.job.admin.service.XxlJobOperateLogService;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.sso.core.annotation.XxlSso;
 import com.xxl.sso.core.helper.XxlSsoHelper;
@@ -37,9 +35,6 @@ public class LoginController {
 	@Resource
 	private XxlJobUserMapper xxlJobUserMapper;
 
-	@Resource
-	private XxlJobOperateLogService xxlJobOperateLogService;
-
 	@RequestMapping("/login")
 	@XxlSso(login = false)
 	public ModelAndView login(HttpServletRequest request, HttpServletResponse response, ModelAndView modelAndView) {
@@ -57,6 +52,7 @@ public class LoginController {
 	@RequestMapping(value="/doLogin", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OperateLog(module = "LOGIN", action = "LOGIN", description = "用户登录")
 	public Response<String> doLogin(HttpServletRequest request, HttpServletResponse response, String userName, String password, String ifRemember){
 
 		// param
@@ -79,81 +75,15 @@ public class LoginController {
 
 		// xxl-sso, do login
 		LoginInfo loginInfo = new LoginInfo(String.valueOf(xxlJobUser.getId()), UUIDTool.getSimpleUUID());
-		Response<String> result= XxlSsoHelper.loginWithCookie(loginInfo, response, ifRem);
-
-		if (result.isSuccess()) {
-			try {
-				XxlJobOperateLog log = new XxlJobOperateLog();
-				log.setModule(XxlJobOperateLog.Module.LOGIN.getCode());
-				log.setAction(XxlJobOperateLog.Action.LOGIN.getCode());
-				log.setOperator(userName);
-				log.setOperateTime(new java.util.Date());
-				log.setIp(getClientIp(request));
-				xxlJobOperateLogService.save(log);
-			} catch (Exception e) {
-				logger.error("Record login log error: {}", e.getMessage(), e);
-			}
-		}
-
-		return Response.of(result.getCode(), result.getMsg());
+		return XxlSsoHelper.loginWithCookie(loginInfo, response, ifRem);
 	}
 	
 	@RequestMapping(value="/logout", method=RequestMethod.POST)
 	@ResponseBody
 	@XxlSso(login=false)
+	@OperateLog(module = "LOGIN", action = "LOGOUT", description = "用户注销")
 	public Response<String> logout(HttpServletRequest request, HttpServletResponse response){
-
-		String userName = null;
-		try {
-			Response<LoginInfo> loginInfoResponse = XxlSsoHelper.loginCheckWithAttr(request);
-			if (loginInfoResponse.isSuccess() && loginInfoResponse.getData() != null) {
-				userName = loginInfoResponse.getData().getUserName();
-			}
-		} catch (Exception e) {
-			logger.debug("Get login info error: {}", e.getMessage());
-		}
-
-		// xxl-sso, do logout
-		Response<String> result = XxlSsoHelper.logoutWithCookie(request, response);
-
-		if (userName != null) {
-			try {
-				XxlJobOperateLog log = new XxlJobOperateLog();
-				log.setModule(XxlJobOperateLog.Module.LOGIN.getCode());
-				log.setAction(XxlJobOperateLog.Action.LOGOUT.getCode());
-				log.setOperator(userName);
-				log.setOperateTime(new java.util.Date());
-				log.setIp(getClientIp(request));
-				xxlJobOperateLogService.save(log);
-			} catch (Exception e) {
-				logger.error("Record logout log error: {}", e.getMessage(), e);
-			}
-		}
-
-		return Response.of(result.getCode(), result.getMsg());
-	}
-
-	private String getClientIp(HttpServletRequest request) {
-		String ip = request.getHeader("X-Forwarded-For");
-		if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-			ip = request.getHeader("Proxy-Client-IP");
-		}
-		if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-			ip = request.getHeader("WL-Proxy-Client-IP");
-		}
-		if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-			ip = request.getHeader("HTTP_CLIENT_IP");
-		}
-		if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-			ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-		}
-		if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-			ip = request.getRemoteAddr();
-		}
-		if (ip != null && ip.contains(",")) {
-			ip = ip.split(",")[0].trim();
-		}
-		return ip;
+		return XxlSsoHelper.logoutWithCookie(request, response);
 	}
 
 	@RequestMapping("/updatePwd")
