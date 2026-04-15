@@ -39,6 +39,7 @@
 
 		<!-- spring -->
 		<spring-boot.version>4.0.1</spring-boot.version>
+		<spring-boot-starter-aop.version>4.0.1</spring-boot-starter-aop.version>
 		<spring.version>7.0.2</spring.version>
 		<!-- mybatis & db -->
 		<mybatis-spring-boot-starter.version>4.0.1</mybatis-spring-boot-starter.version>
@@ -75,7 +76,7 @@
 			<dependency>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-starter-aop</artifactId>
-				<version>${spring-boot.version}</version>
+				<version>${spring-boot-starter-aop.version}</version>
 			</dependency>
 
 			<!-- slf4j -->
