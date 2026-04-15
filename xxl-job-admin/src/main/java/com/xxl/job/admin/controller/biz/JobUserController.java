@@ -1,9 +1,11 @@
 package com.xxl.job.admin.controller.biz;
 
 import com.xxl.job.admin.constant.Consts;
+import com.xxl.job.admin.core.annotation.OperateLog;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
+import com.xxl.job.admin.model.XxlJobOperateLog;
 import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.sso.core.annotation.XxlSso;
@@ -22,9 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author xuxueli 2019-05-04 16:39:50
@@ -79,6 +79,7 @@ public class JobUserController {
     @RequestMapping("/insert")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperateLog(module = "USER", action = "ADD", description = "新增用户")
     public Response<String> insert(XxlJobUser xxlJobUser) {
 
         // valid username
@@ -115,6 +116,7 @@ public class JobUserController {
     @RequestMapping("/update")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperateLog(module = "USER", action = "UPDATE", description = "编辑用户")
     public Response<String> update(HttpServletRequest request, XxlJobUser xxlJobUser) {
 
         // avoid opt login seft
@@ -144,6 +146,7 @@ public class JobUserController {
     @RequestMapping("/delete")
     @ResponseBody
     @XxlSso(role = Consts.ADMIN_ROLE)
+    @OperateLog(module = "USER", action = "DELETE", description = "删除用户")
     public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
         // valid

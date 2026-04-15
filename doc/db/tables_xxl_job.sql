@@ -142,6 +142,27 @@ CREATE TABLE `xxl_job_user`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
+## —————————————————————— operate log ——————————————————
+
+CREATE TABLE `xxl_job_operate_log`
+(
+    `id`           int(11)      NOT NULL AUTO_INCREMENT,
+    `module`       varchar(50)  NOT NULL COMMENT '模块：LOGIN-登录, USER-用户管理, JOB_GROUP-执行器管理, JOB_INFO-任务管理',
+    `action`       varchar(50)  NOT NULL COMMENT '操作类型：ADD-新增, UPDATE-编辑, DELETE-删除, START-启动, STOP-停止, LOGIN-登录, LOGOUT-注销',
+    `operator`     varchar(50)  DEFAULT NULL COMMENT '操作人账号',
+    `operate_time` datetime     DEFAULT NULL COMMENT '操作时间',
+    `ip`           varchar(128) DEFAULT NULL COMMENT 'IP地址',
+    `target_id`    int(11)      DEFAULT NULL COMMENT '操作目标ID',
+    `target_name`  varchar(255) DEFAULT NULL COMMENT '操作目标名称',
+    `extra_data`   text         DEFAULT NULL COMMENT '额外数据（JSON格式）',
+    PRIMARY KEY (`id`),
+    KEY `i_module` (`module`),
+    KEY `i_operate_time` (`operate_time`),
+    KEY `i_operator` (`operator`),
+    KEY `i_target_id` (`target_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
+
 
 ## —————————————————————— for default data ——————————————————
 

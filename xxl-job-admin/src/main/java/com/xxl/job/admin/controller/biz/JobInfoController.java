@@ -1,5 +1,6 @@
 package com.xxl.job.admin.controller.biz;
 
+import com.xxl.job.admin.core.annotation.OperateLog;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
 import com.xxl.job.admin.model.XxlJobInfo;
@@ -98,6 +99,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/insert")
 	@ResponseBody
+	@OperateLog(module = "JOB_INFO", action = "ADD", description = "新增任务")
 	public Response<String> add(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -108,6 +110,7 @@ public class JobInfoController {
 
 	@RequestMapping("/update")
 	@ResponseBody
+	@OperateLog(module = "JOB_INFO", action = "UPDATE", description = "编辑任务")
 	public Response<String> update(HttpServletRequest request, XxlJobInfo jobInfo) {
 		// valid permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
@@ -118,6 +121,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/delete")
 	@ResponseBody
+	@OperateLog(module = "JOB_INFO", action = "DELETE", description = "删除任务")
 	public Response<String> delete(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -132,6 +136,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/stop")
 	@ResponseBody
+	@OperateLog(module = "JOB_INFO", action = "STOP", description = "停止任务")
 	public Response<String> pause(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
@@ -146,6 +151,7 @@ public class JobInfoController {
 	
 	@RequestMapping("/start")
 	@ResponseBody
+	@OperateLog(module = "JOB_INFO", action = "START", description = "启动任务")
 	public Response<String> start(HttpServletRequest request, @RequestParam("ids[]") List<Integer> ids) {
 
 		// valid
