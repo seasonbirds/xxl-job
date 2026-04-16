@@ -3,26 +3,27 @@
 	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xxl.job.admin.mapper.XxlJobRoleMapper">
 
+	<!-- 角色结果映射 -->
 	<resultMap id="XxlJobRole" type="com.xxl.job.admin.model.XxlJobRole" >
 		<result column="id" property="id" />
 		<result column="name" property="name" />
 	    <result column="code" property="code" />
 	    <result column="status" property="status" />
-	    <result column="old_role" property="oldRole" />
 	    <result column="add_time" property="addTime" />
 	    <result column="update_time" property="updateTime" />
 	</resultMap>
 
+	<!-- 基础查询字段列表 -->
 	<sql id="Base_Column_List">
 		t.id,
 		t.name,
 		t.code,
 		t.status,
-		t.old_role,
 		t.add_time,
 		t.update_time
 	</sql>
 
+	<!-- 分页查询角色列表 -->
 	<select id="pageList" parameterType="java.util.HashMap" resultMap="XxlJobRole">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_job_role AS t
@@ -41,6 +42,7 @@
 		LIMIT #{offset}, #{pagesize}
 	</select>
 
+	<!-- 分页查询角色总数 -->
 	<select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
 		SELECT count(1)
 		FROM xxl_job_role AS t
@@ -57,71 +59,68 @@
 		</trim>
 	</select>
 
+	<!-- 根据ID查询角色 -->
 	<select id="loadById" parameterType="java.util.HashMap" resultMap="XxlJobRole">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_job_role AS t
 		WHERE t.id = #{id}
 	</select>
 
+	<!-- 根据名称查询角色（用于重复校验） -->
 	<select id="loadByName" parameterType="java.util.HashMap" resultMap="XxlJobRole">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_job_role AS t
 		WHERE t.name = #{name}
 	</select>
 
+	<!-- 根据编码查询角色（用于重复校验） -->
 	<select id="loadByCode" parameterType="java.util.HashMap" resultMap="XxlJobRole">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_job_role AS t
 		WHERE t.code = #{code}
 	</select>
 
+	<!-- 新增角色 -->
 	<insert id="save" parameterType="com.xxl.job.admin.model.XxlJobRole" useGeneratedKeys="true" keyProperty="id" >
 		INSERT INTO xxl_job_role (
 			name,
 			code,
 			status,
-			old_role,
 			add_time,
 			update_time
 		) VALUES (
 			#{name},
 			#{code},
 			#{status},
-			#{oldRole},
 			#{addTime},
 			#{updateTime}
 		);
 	</insert>
 
+	<!-- 更新角色 -->
 	<update id="update" parameterType="com.xxl.job.admin.model.XxlJobRole" >
 		UPDATE xxl_job_role
 		SET
 			name = #{name},
 			code = #{code},
 			status = #{status},
-			old_role = #{oldRole},
 			update_time = #{updateTime}
 		WHERE id = #{id}
 	</update>
 
+	<!-- 删除角色 -->
 	<delete id="delete" parameterType="java.util.HashMap">
 		DELETE
 		FROM xxl_job_role
 		WHERE id = #{id}
 	</delete>
 
+	<!-- 查询所有启用状态的角色（用于用户管理页面下拉框） -->
 	<select id="findAllEnabled" resultMap="XxlJobRole">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_job_role AS t
 		WHERE t.status = 1
 		ORDER BY add_time ASC
-	</select>
-
-	<select id="findByOldRole" parameterType="java.util.HashMap" resultMap="XxlJobRole">
-		SELECT <include refid="Base_Column_List" />
-		FROM xxl_job_role AS t
-		WHERE t.old_role = #{oldRole}
-		AND t.status = 1
 	</select>
 
 </mapper>

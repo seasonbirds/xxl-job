@@ -17,7 +17,7 @@
 
 		<!-- 2-content start -->
 
-		<#-- 查询区域 -->
+		<#-- 查询区域：名称、编码、状态 -->
 		<div class="box" style="margin-bottom:9px;">
 			<div class="box-body">
 				<div class="row" id="data_filter" >
@@ -77,7 +77,7 @@
 			</div>
 		</div>
 
-		<!-- 新增.模态框 -->
+		<!-- 新增.模态框：表单只包含名称、编码 -->
 		<div class="modal fade" id="addModal" tabindex="-1" role="dialog"  aria-hidden="true">
 			<div class="modal-dialog">
 				<div class="modal-content">
@@ -94,15 +94,6 @@
 								<label for="lastname" class="col-sm-2 control-label">${I18n.role_code}<font color="red">*</font></label>
 								<div class="col-sm-8"><input type="text" class="form-control" name="code" placeholder="${I18n.system_please_input}${I18n.role_code}" maxlength="50" ></div>
 							</div>
-							<div class="form-group">
-								<label for="lastname" class="col-sm-2 control-label">${I18n.role_old_role}<font color="black">*</font></label>
-								<div class="col-sm-10">
-									<input type="radio" name="oldRole" value="0" checked />${I18n.user_role_normal}
-									&nbsp;&nbsp;&nbsp;&nbsp;
-									<input type="radio" name="oldRole" value="1" />${I18n.user_role_admin}
-									<div class="help-block text-muted" style="margin-bottom: 0;">${I18n.role_old_role_tip}</div>
-								</div>
-							</div>
 
 							<hr>
 							<div class="form-group">
@@ -118,7 +109,7 @@
 			</div>
 		</div>
 
-		<!-- 更新.模态框 -->
+		<!-- 更新.模态框：表单只包含名称、编码（状态不能编辑） -->
 		<div class="modal fade" id="updateModal" tabindex="-1" role="dialog"  aria-hidden="true">
 			<div class="modal-dialog">
 				<div class="modal-content">
@@ -135,15 +126,6 @@
 								<label for="lastname" class="col-sm-2 control-label">${I18n.role_code}<font color="red">*</font></label>
 								<div class="col-sm-8"><input type="text" class="form-control" name="code" placeholder="${I18n.system_please_input}${I18n.role_code}" maxlength="50" ></div>
 							</div>
-							<div class="form-group">
-								<label for="lastname" class="col-sm-2 control-label">${I18n.role_old_role}<font color="black">*</font></label>
-								<div class="col-sm-10">
-									<input type="radio" name="oldRole" value="0" />${I18n.user_role_normal}
-									&nbsp;&nbsp;&nbsp;&nbsp;
-									<input type="radio" name="oldRole" value="1" />${I18n.user_role_admin}
-									<div class="help-block text-muted" style="margin-bottom: 0;">${I18n.role_old_role_tip}</div>
-								</div>
-							</div>
 
 							<hr>
 							<div class="form-group">
@@ -155,36 +137,6 @@
 							</div>
 
 						</form>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<!-- 查看用户.模态框 -->
-		<div class="modal fade" id="viewUsersModal" tabindex="-1" role="dialog"  aria-hidden="true">
-			<div class="modal-dialog">
-				<div class="modal-content">
-					<div class="modal-header">
-						<h4 class="modal-title" >${I18n.role_view_users}</h4>
-					</div>
-					<div class="modal-body">
-						<div class="form-horizontal" role="form" >
-							<div class="form-group">
-								<label class="col-sm-3 control-label">${I18n.role_name}：</label>
-								<div class="col-sm-8">
-									<p class="form-control-static" id="viewUsersRoleName"></p>
-								</div>
-							</div>
-							<div class="form-group">
-								<label class="col-sm-3 control-label">${I18n.role_user_list}：</label>
-								<div class="col-sm-8">
-									<div id="viewUsersList" class="form-control-static" style="word-wrap: break-word; max-height: 300px; overflow-y: auto;"></div>
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="modal-footer">
-						<button type="button" class="btn btn-default" data-dismiss="modal">${I18n.system_close}</button>
 					</div>
 				</div>
 			</div>
@@ -206,7 +158,8 @@
 	$(function() {
 
 		/**
-		 * init table
+		 * 初始化数据表格
+		 * 展示角色列表：名称、编码、状态
 		 */
 		$.adminTable.initTable({
 			table: '#data_list',
@@ -231,46 +184,37 @@
 				},{
 					title: I18n.role_name,
 					field: 'name',
-					width: '20',
+					width: '30',
 					widthUnit: '%',
 					align: 'left'
 				},{
 					title: I18n.role_code,
 					field: 'code',
-					width: '20',
+					width: '30',
 					widthUnit: '%',
 					align: 'left'
 				},{
 					title: I18n.system_status,
 					field: 'status',
-					width: '10',
+					width: '20',
 					widthUnit: '%',
 					formatter: function(value, row, index) {
 						return value == 1 ? I18n.role_status_enabled : I18n.role_status_disabled;
-					}
-				},{
-					title: I18n.system_opt,
-					field: 'opt',
-					width: '15',
-					widthUnit: '%',
-					align: 'center',
-					valign: 'middle',
-					formatter: function(value, row, index) {
-						return '<button class="btn btn-xs btn-primary viewUsers" data-id="' + row.oldRole + '" data-name="' + row.name + '">' + I18n.role_view_users + '</button>';
 					}
 				}
 			]
 		});
 
 		/**
-		 * init delete
+		 * 初始化删除操作
 		 */
 		$.adminTable.initDelete({
 			url: base_url + "/role/delete"
 		});
 
 		/**
-		 * init enable
+		 * 初始化启用操作
+		 * 将选中的角色状态改为启用
 		 */
 		$("#data_operation").on('click', '.enable',function() {
 			var rows = $.adminTable.selectRows();
@@ -306,7 +250,8 @@
 		});
 
 		/**
-		 * init disable
+		 * 初始化禁用操作
+		 * 将选中的角色状态改为禁用
 		 */
 		$("#data_operation").on('click', '.disable',function() {
 			var rows = $.adminTable.selectRows();
@@ -342,41 +287,8 @@
 		});
 
 		/**
-		 * view users
-		 */
-		$("#data_list").on('click', '.viewUsers',function() {
-			var oldRole = $(this).data('id');
-			var roleName = $(this).data('name');
-
-			$('#viewUsersRoleName').text(roleName);
-			$('#viewUsersList').html('<i class="fa fa-spinner fa-spin"></i> ' + I18n.system_loading);
-
-			$('#viewUsersModal').modal({backdrop: false, keyboard: false}).modal('show');
-
-			$.ajax({
-				type : 'GET',
-				url : base_url + "/role/getUsersByRole",
-				data : {
-					"oldRole" : oldRole
-				},
-				dataType : "json",
-				success : function(data){
-					if (data.code === 200) {
-						var usernames = data.data;
-						if (usernames && usernames.length > 0) {
-							$('#viewUsersList').html(usernames.join(', '));
-						} else {
-							$('#viewUsersList').html('<span class="text-muted">' + I18n.system_empty + '</span>');
-						}
-					} else {
-						$('#viewUsersList').html('<span class="text-danger">' + (data.msg || I18n.system_fail) + '</span>');
-					}
-				}
-			});
-		});
-
-		/**
-		 * init add
+		 * 初始化新增操作
+		 * 表单验证：名称、编码必填，长度2-50
 		 */
 		$.adminTable.initAdd( {
 			url: base_url + "/role/insert",
@@ -401,7 +313,7 @@
 				}
 			},
 			writeFormData: function() {
-				$("#addModal .form input[name='oldRole'][value='0']").prop("checked", true);
+				// 打开新增窗口时无需特殊处理
 			},
 			readFormData: function() {
 				return $("#addModal .form").serializeArray();
@@ -409,22 +321,25 @@
 		});
 
 		/**
-		 * init update
+		 * 初始化更新操作
+		 * 注意：禁用状态的角色不能编辑
+		 * 编辑时不能修改状态，状态只能通过启用/禁用按钮操作
 		 */
 		$.adminTable.initUpdate( {
 			url: base_url + "/role/update",
 			writeFormData: function(row) {
 
+				// 禁用状态的角色不能编辑
 				if (row.status == 0) {
 					$('#updateModal').modal('hide');
 					layer.msg(I18n.role_disabled_cannot_edit);
 					return;
 				}
 
+				// 填充表单数据（状态不能编辑）
 				$("#updateModal .form input[name='id']").val( row.id );
 				$("#updateModal .form input[name='name']").val( row.name );
 				$("#updateModal .form input[name='code']").val( row.code );
-				$("#updateModal .form input[name='oldRole'][value='"+ row.oldRole +"']").prop("checked", true);
 
 			},
 			readFormData: function() {

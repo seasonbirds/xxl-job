@@ -2,14 +2,42 @@ package com.xxl.job.admin.model;
 
 import java.util.Date;
 
+/**
+ * 角色实体类
+ * 用于管理系统中的角色信息
+ *
+ * @author xxl-job
+ */
 public class XxlJobRole {
 
+    /**
+     * 主键ID
+     */
     private int id;
+
+    /**
+     * 角色名称
+     */
     private String name;
+
+    /**
+     * 角色编码
+     */
     private String code;
+
+    /**
+     * 状态：0-禁用、1-启用
+     */
     private int status;
-    private int oldRole;
+
+    /**
+     * 创建时间
+     */
     private Date addTime;
+
+    /**
+     * 更新时间
+     */
     private Date updateTime;
 
     public int getId() {
@@ -42,14 +70,6 @@ public class XxlJobRole {
 
     public void setStatus(int status) {
         this.status = status;
-    }
-
-    public int getOldRole() {
-        return oldRole;
-    }
-
-    public void setOldRole(int oldRole) {
-        this.oldRole = oldRole;
     }
 
     public Date getAddTime() {
