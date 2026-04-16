@@ -28,7 +28,6 @@ import java.util.List;
  * 
  * 关联说明：
  * - 用户表 `xxl_job_user.role` 字段关联角色表 `xxl_job_role.id`
- * - 角色表 `xxl_job_role.role_type` 字段用于权限判断（0-普通用户，1-管理员）
  *
  * @author xxl-job
  */
@@ -176,11 +175,8 @@ public class JobRoleController {
             return Response.ofFail(I18nUtil.getString("role_code_repeat"));
         }
 
-        // 设置默认值：默认启用，权限类型默认普通用户
+        // 设置默认值：默认启用
         xxlJobRole.setStatus(1);
-        if (xxlJobRole.getRoleType() != 0 && xxlJobRole.getRoleType() != 1) {
-            xxlJobRole.setRoleType(0);
-        }
         Date now = new Date();
         xxlJobRole.setAddTime(now);
         xxlJobRole.setUpdateTime(now);
@@ -246,10 +242,6 @@ public class JobRoleController {
         // 更新角色信息（状态保持不变，只能通过启用/禁用按钮修改）
         existRole.setName(xxlJobRole.getName());
         existRole.setCode(xxlJobRole.getCode());
-        // 允许更新权限类型
-        if (xxlJobRole.getRoleType() == 0 || xxlJobRole.getRoleType() == 1) {
-            existRole.setRoleType(xxlJobRole.getRoleType());
-        }
         existRole.setUpdateTime(new Date());
 
         // 执行更新
