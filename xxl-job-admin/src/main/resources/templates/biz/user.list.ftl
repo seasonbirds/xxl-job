@@ -27,8 +27,11 @@
 							<span class="input-group-addon">${I18n.user_role}</span>
 							<select class="form-control" id="role" >
 								<option value="-1" >${I18n.system_all}</option>
-								<option value="1" >${I18n.user_role_admin}</option>
-								<option value="0" >${I18n.user_role_normal}</option>
+								<#if roleList?exists && roleList?size gt 0>
+									<#list roleList as role>
+										<option value="${role.oldRole}" >${role.name}</option>
+									</#list>
+								</#if>
 							</select>
 						</div>
 					</div>
@@ -88,15 +91,19 @@
 							</div>
 							<div class="form-group">
 								<label for="lastname" class="col-sm-2 control-label">${I18n.user_role}<font color="red">*</font></label>
-								<div class="col-sm-10">
-									<input type="radio" name="role" value="0" checked />${I18n.user_role_normal}
-									&nbsp;&nbsp;&nbsp;&nbsp;
-									<input type="radio" name="role" value="1" />${I18n.user_role_admin}
+								<div class="col-sm-8">
+									<select class="form-control" name="role" >
+										<#if roleList?exists && roleList?size gt 0>
+											<#list roleList as role>
+												<option value="${role.oldRole}" >${role.name}</option>
+											</#list>
+										</#if>
+									</select>
 								</div>
 							</div>
 							<div class="form-group">
 								<label for="lastname" class="col-sm-2 control-label">${I18n.user_permission}<font color="black">*</font></label>
-								<div class="col-sm-10">
+								<div class="col-sm-10" id="addPermissionGroup">
 									<#if groupList?exists && groupList?size gt 0>
 										<#list groupList as item>
 											<input type="checkbox" name="permission" value="${item.id}" />&nbsp;&nbsp;${item.title}：${item.appname}
@@ -139,15 +146,19 @@
 							</div>
 							<div class="form-group">
 								<label for="lastname" class="col-sm-2 control-label">${I18n.user_role}<font color="red">*</font></label>
-								<div class="col-sm-10">
-									<input type="radio" name="role" value="0" />${I18n.user_role_normal}
-									&nbsp;&nbsp;&nbsp;&nbsp;
-									<input type="radio" name="role" value="1" />${I18n.user_role_admin}
+								<div class="col-sm-8">
+									<select class="form-control" name="role" >
+										<#if roleList?exists && roleList?size gt 0>
+											<#list roleList as role>
+												<option value="${role.oldRole}" >${role.name}</option>
+											</#list>
+										</#if>
+									</select>
 								</div>
 							</div>
 							<div class="form-group">
 								<label for="lastname" class="col-sm-2 control-label">${I18n.user_permission}<font color="black">*</font></label>
-								<div class="col-sm-10">
+								<div class="col-sm-10" id="updatePermissionGroup">
 									<#if groupList?exists && groupList?size gt 0>
 										<#list groupList as item>
 											<input type="checkbox" name="permission" value="${item.id}" />${item.title}(${item.appname})<br>
@@ -185,6 +196,14 @@
 <script src="${request.contextPath}/static/biz/common/admin.table.js"></script>
 <script>
 	$(function() {
+
+		<#-- 构建角色映射 -->
+		var roleMap = {};
+		<#if roleList?exists && roleList?size gt 0>
+			<#list roleList as role>
+				roleMap["${role.oldRole}"] = "${role.name}";
+			</#list>
+		</#if>
 
 		/**
 		 * init table
@@ -228,13 +247,8 @@
 					width: '10',
 					widthUnit: '%',
 					formatter: function(value, row, index) {
-						let result = value;
-						$('#data_filter #role option').each(function(){
-							if ( value+"" === $(this).val() ) {
-								result = $(this).text();
-							}
-						});
-						return result;
+						var roleName = roleMap[value + ""];
+						return roleName ? roleName : value;
 					}
 				}
 			]
@@ -246,6 +260,26 @@
 		$.adminTable.initDelete({
 			url: base_url + "/user/delete"
 		});
+
+		/**
+		 * 检查是否是管理员角色
+		 */
+		function isAdminRole(roleValue) {
+			return roleValue == 1;
+		}
+
+		/**
+		 * 根据角色值显示/隐藏权限选择
+		 */
+		function togglePermissionByRole(roleSelect, permissionGroup) {
+			var roleValue = roleSelect.val();
+			if (isAdminRole(roleValue)) {
+				permissionGroup.parents('.form-group').hide();
+				permissionGroup.find('input[name="permission"]').prop("checked", false);
+			} else {
+				permissionGroup.parents('.form-group').show();
+			}
+		}
 
 		/**
 		 * init add
@@ -280,7 +314,8 @@
 				}
 			},
 			writeFormData: function() {
-				$("#addModal .form input[name='role'][value='0']").change();
+				var roleSelect = $("#addModal .form select[name='role']");
+				togglePermissionByRole(roleSelect, $('#addPermissionGroup'));
 			},
 			readFormData: function() {
 				// request
@@ -288,15 +323,9 @@
 			}
 		});
 
-		// add role
-		$("#addModal .form input[name=role]").change(function () {
-			var role = $(this).val();
-			if (role == 1) {
-				$("#addModal .form input[name=permission]").parents('.form-group').hide();
-			} else {
-				$("#addModal .form input[name=permission]").parents('.form-group').show();
-			}
-			$("#addModal .form input[name='permission']").prop("checked",false);
+		// add role change
+		$("#addModal .form select[name=role]").change(function () {
+			togglePermissionByRole($(this), $('#addPermissionGroup'));
 		});
 
 		/**
@@ -310,7 +339,13 @@
 				$("#updateModal .form input[name='id']").val( row.id );
 				$("#updateModal .form input[name='username']").val( row.username );
 				$("#updateModal .form input[name='password']").val( '' );
-				$("#updateModal .form input[name='role'][value='"+ row.role +"']").click();
+				$("#updateModal .form select[name='role']").val(row.role);
+
+				// 根据角色值显示/隐藏权限
+				var roleSelect = $("#updateModal .form select[name='role']");
+				togglePermissionByRole(roleSelect, $('#updatePermissionGroup'));
+
+				// permission
 				var permissionArr = [];
 				if (row.permission) {
 					permissionArr = row.permission.split(",");
@@ -330,15 +365,9 @@
 			}
 		});
 
-		// update role
-		$("#updateModal .form input[name=role]").change(function () {
-			var role = $(this).val();
-			if (role == 1) {
-				$("#updateModal .form input[name=permission]").parents('.form-group').hide();
-			} else {
-				$("#updateModal .form input[name=permission]").parents('.form-group').show();
-			}
-			$("#updateModal .form input[name='permission']").prop("checked",false);
+		// update role change
+		$("#updateModal .form select[name=role]").change(function () {
+			togglePermissionByRole($(this), $('#updatePermissionGroup'));
 		});
 
 	});

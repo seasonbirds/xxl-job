@@ -2,8 +2,10 @@ package com.xxl.job.admin.controller.biz;
 
 import com.xxl.job.admin.constant.Consts;
 import com.xxl.job.admin.mapper.XxlJobGroupMapper;
+import com.xxl.job.admin.mapper.XxlJobRoleMapper;
 import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobGroup;
+import com.xxl.job.admin.model.XxlJobRole;
 import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.sso.core.annotation.XxlSso;
@@ -37,6 +39,8 @@ public class JobUserController {
     private XxlJobUserMapper xxlJobUserMapper;
     @Resource
     private XxlJobGroupMapper xxlJobGroupMapper;
+    @Resource
+    private XxlJobRoleMapper xxlJobRoleMapper;
 
     @RequestMapping
     @XxlSso(role = Consts.ADMIN_ROLE)
@@ -45,6 +49,10 @@ public class JobUserController {
         // 执行器列表
         List<XxlJobGroup> groupList = xxlJobGroupMapper.findAll();
         model.addAttribute("groupList", groupList);
+
+        // 角色列表（启用状态）
+        List<XxlJobRole> roleList = xxlJobRoleMapper.findAllEnabled();
+        model.addAttribute("roleList", roleList);
 
         return "biz/user.list";
     }
