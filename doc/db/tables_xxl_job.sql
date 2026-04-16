@@ -135,7 +135,6 @@ CREATE TABLE `xxl_job_role`
     `name`        varchar(50) NOT NULL COMMENT '角色名称',
     `code`        varchar(50) NOT NULL COMMENT '角色编码',
     `status`      tinyint(4)  NOT NULL DEFAULT '1' COMMENT '状态：0-禁用、1-启用',
-    `role_type`   tinyint(4)  NOT NULL DEFAULT '0' COMMENT '权限类型：0-普通用户、1-管理员（用于权限判断）',
     `add_time`    datetime    DEFAULT NULL COMMENT '创建时间',
     `update_time` datetime    DEFAULT NULL COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -195,9 +194,9 @@ VALUES (1, 1, '示例任务01', now(), now(), 'XXL', '', 'CRON', '0 0 0 * * ? *'
 INSERT INTO `xxl_job_user`(`id`, `username`, `password`, `role`, `permission`)
 VALUES (1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 1, NULL);
 
-INSERT INTO `xxl_job_role`(`id`, `name`, `code`, `status`, `role_type`, `add_time`, `update_time`)
-VALUES (1, '管理员', 'ADMIN', 1, 1, now(), now()),
-       (2, '普通用户', 'NORMAL', 1, 0, now(), now());
+INSERT INTO `xxl_job_role`(`id`, `name`, `code`, `status`, `add_time`, `update_time`)
+VALUES (1, '管理员', 'ADMIN', 1, now(), now()),
+       (2, '普通用户', 'NORMAL', 1, now(), now());
 
 INSERT INTO `xxl_job_lock` (`lock_name`)
 VALUES ('schedule_lock');

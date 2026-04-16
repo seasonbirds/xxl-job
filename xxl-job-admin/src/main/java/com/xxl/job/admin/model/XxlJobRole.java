@@ -8,7 +8,6 @@ import java.util.Date;
  * 
  * 关联说明：
  * - 用户表 `xxl_job_user.role` 字段关联本表的 `id` 字段
- * - 权限判断通过本实体的 `roleType` 字段（0-普通用户，1-管理员）
  *
  * @author xxl-job
  */
@@ -33,12 +32,6 @@ public class XxlJobRole {
      * 状态：0-禁用、1-启用
      */
     private int status;
-
-    /**
-     * 权限类型：0-普通用户、1-管理员
-     * 用于权限判断，与原系统的 `xxl_job_user.role` 字段含义一致
-     */
-    private int roleType;
 
     /**
      * 创建时间
@@ -80,14 +73,6 @@ public class XxlJobRole {
 
     public void setStatus(int status) {
         this.status = status;
-    }
-
-    public int getRoleType() {
-        return roleType;
-    }
-
-    public void setRoleType(int roleType) {
-        this.roleType = roleType;
     }
 
     public Date getAddTime() {
