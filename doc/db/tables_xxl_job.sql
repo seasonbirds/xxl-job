@@ -127,6 +127,23 @@ CREATE TABLE `xxl_job_lock`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
+## —————————————————————— role ——————————————————
+
+CREATE TABLE `xxl_job_role`
+(
+    `id`         int(11)     NOT NULL AUTO_INCREMENT,
+    `name`       varchar(50) NOT NULL COMMENT '角色名称',
+    `code`       varchar(50) NOT NULL COMMENT '角色编码',
+    `status`     tinyint(4)  NOT NULL DEFAULT '1' COMMENT '状态：0-禁用、1-启用',
+    `old_role`   tinyint(4)  NOT NULL DEFAULT '0' COMMENT '对应权限：0-普通用户、1-管理员',
+    `add_time`   datetime    DEFAULT NULL COMMENT '创建时间',
+    `update_time` datetime   DEFAULT NULL COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `i_name` (`name`) USING BTREE,
+    UNIQUE KEY `i_code` (`code`) USING BTREE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
+
 ## —————————————————————— user ——————————————————
 
 CREATE TABLE `xxl_job_user`
@@ -177,6 +194,10 @@ VALUES (1, 1, '示例任务01', now(), now(), 'XXL', '', 'CRON', '0 0 0 * * ? *'
 
 INSERT INTO `xxl_job_user`(`id`, `username`, `password`, `role`, `permission`)
 VALUES (1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 1, NULL);
+
+INSERT INTO `xxl_job_role`(`id`, `name`, `code`, `status`, `old_role`, `add_time`, `update_time`)
+VALUES (1, '管理员', 'ADMIN', 1, 1, now(), now()),
+       (2, '普通用户', 'NORMAL', 1, 0, now(), now());
 
 INSERT INTO `xxl_job_lock` (`lock_name`)
 VALUES ('schedule_lock');

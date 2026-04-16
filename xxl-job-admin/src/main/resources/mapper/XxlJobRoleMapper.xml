@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xxl.job.admin.mapper.XxlJobRoleMapper">
+
+	<resultMap id="XxlJobRole" type="com.xxl.job.admin.model.XxlJobRole" >
+		<result column="id" property="id" />
+		<result column="name" property="name" />
+	    <result column="code" property="code" />
+	    <result column="status" property="status" />
+	    <result column="old_role" property="oldRole" />
+	    <result column="add_time" property="addTime" />
+	    <result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		t.id,
+		t.name,
+		t.code,
+		t.status,
+		t.old_role,
+		t.add_time,
+		t.update_time
+	</sql>
+
+	<select id="pageList" parameterType="java.util.HashMap" resultMap="XxlJobRole">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_job_role AS t
+		<trim prefix="WHERE" prefixOverrides="AND | OR" >
+			<if test="name != null and name != ''">
+				AND t.name like CONCAT(CONCAT('%', #{name}), '%')
+			</if>
+			<if test="code != null and code != ''">
+				AND t.code like CONCAT(CONCAT('%', #{code}), '%')
+			</if>
+			<if test="status gt -1">
+				AND t.status = #{status}
+			</if>
+		</trim>
+		ORDER BY add_time ASC
+		LIMIT #{offset}, #{pagesize}
+	</select>
+
+	<select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
+		SELECT count(1)
+		FROM xxl_job_role AS t
+		<trim prefix="WHERE" prefixOverrides="AND | OR" >
+			<if test="name != null and name != ''">
+				AND t.name like CONCAT(CONCAT('%', #{name}), '%')
+			</if>
+			<if test="code != null and code != ''">
+				AND t.code like CONCAT(CONCAT('%', #{code}), '%')
+			</if>
+			<if test="status gt -1">
+				AND t.status = #{status}
+			</if>
+		</trim>
+	</select>
+
+	<select id="loadById" parameterType="java.util.HashMap" resultMap="XxlJobRole">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_job_role AS t
+		WHERE t.id = #{id}
+	</select>
+
+	<select id="loadByName" parameterType="java.util.HashMap" resultMap="XxlJobRole">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_job_role AS t
+		WHERE t.name = #{name}
+	</select>
+
+	<select id="loadByCode" parameterType="java.util.HashMap" resultMap="XxlJobRole">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_job_role AS t
+		WHERE t.code = #{code}
+	</select>
+
+	<insert id="save" parameterType="com.xxl.job.admin.model.XxlJobRole" useGeneratedKeys="true" keyProperty="id" >
+		INSERT INTO xxl_job_role (
+			name,
+			code,
+			status,
+			old_role,
+			add_time,
+			update_time
+		) VALUES (
+			#{name},
+			#{code},
+			#{status},
+			#{oldRole},
+			#{addTime},
+			#{updateTime}
+		);
+	</insert>
+
+	<update id="update" parameterType="com.xxl.job.admin.model.XxlJobRole" >
+		UPDATE xxl_job_role
+		SET
+			name = #{name},
+			code = #{code},
+			status = #{status},
+			old_role = #{oldRole},
+			update_time = #{updateTime}
+		WHERE id = #{id}
+	</update>
+
+	<delete id="delete" parameterType="java.util.HashMap">
+		DELETE
+		FROM xxl_job_role
+		WHERE id = #{id}
+	</delete>
+
+	<select id="findAllEnabled" resultMap="XxlJobRole">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_job_role AS t
+		WHERE t.status = 1
+		ORDER BY add_time ASC
+	</select>
+
+	<select id="findByOldRole" parameterType="java.util.HashMap" resultMap="XxlJobRole">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_job_role AS t
+		WHERE t.old_role = #{oldRole}
+		AND t.status = 1
+	</select>
+
+</mapper>
