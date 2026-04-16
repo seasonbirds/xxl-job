@@ -131,13 +131,13 @@ CREATE TABLE `xxl_job_lock`
 
 CREATE TABLE `xxl_job_role`
 (
-    `id`         int(11)     NOT NULL AUTO_INCREMENT,
-    `name`       varchar(50) NOT NULL COMMENT '角色名称',
-    `code`       varchar(50) NOT NULL COMMENT '角色编码',
-    `status`     tinyint(4)  NOT NULL DEFAULT '1' COMMENT '状态：0-禁用、1-启用',
-    `old_role`   tinyint(4)  NOT NULL DEFAULT '0' COMMENT '对应权限：0-普通用户、1-管理员',
-    `add_time`   datetime    DEFAULT NULL COMMENT '创建时间',
-    `update_time` datetime   DEFAULT NULL COMMENT '更新时间',
+    `id`          int(11)     NOT NULL AUTO_INCREMENT,
+    `name`        varchar(50) NOT NULL COMMENT '角色名称',
+    `code`        varchar(50) NOT NULL COMMENT '角色编码',
+    `status`      tinyint(4)  NOT NULL DEFAULT '1' COMMENT '状态：0-禁用、1-启用',
+    `role_type`   tinyint(4)  NOT NULL DEFAULT '0' COMMENT '权限类型：0-普通用户、1-管理员（用于权限判断）',
+    `add_time`    datetime    DEFAULT NULL COMMENT '创建时间',
+    `update_time` datetime    DEFAULT NULL COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `i_name` (`name`) USING BTREE,
     UNIQUE KEY `i_code` (`code`) USING BTREE
@@ -152,7 +152,7 @@ CREATE TABLE `xxl_job_user`
     `username`   varchar(50) NOT NULL COMMENT '账号',
     `password`   varchar(100) NOT NULL COMMENT '密码加密信息',
     `token`      varchar(100) DEFAULT NULL COMMENT '登录token',
-    `role`       tinyint(4)  NOT NULL COMMENT '角色：0-普通用户、1-管理员',
+    `role`       int(11)     NOT NULL COMMENT '角色ID（关联xxl_job_role.id）',
     `permission` varchar(255) DEFAULT NULL COMMENT '权限：执行器ID列表，多个逗号分割',
     PRIMARY KEY (`id`),
     UNIQUE KEY `i_username` (`username`) USING BTREE
@@ -195,7 +195,7 @@ VALUES (1, 1, '示例任务01', now(), now(), 'XXL', '', 'CRON', '0 0 0 * * ? *'
 INSERT INTO `xxl_job_user`(`id`, `username`, `password`, `role`, `permission`)
 VALUES (1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 1, NULL);
 
-INSERT INTO `xxl_job_role`(`id`, `name`, `code`, `status`, `old_role`, `add_time`, `update_time`)
+INSERT INTO `xxl_job_role`(`id`, `name`, `code`, `status`, `role_type`, `add_time`, `update_time`)
 VALUES (1, '管理员', 'ADMIN', 1, 1, now(), now()),
        (2, '普通用户', 'NORMAL', 1, 0, now(), now());
 

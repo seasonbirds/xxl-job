@@ -9,6 +9,7 @@
 		<result column="name" property="name" />
 	    <result column="code" property="code" />
 	    <result column="status" property="status" />
+	    <result column="role_type" property="roleType" />
 	    <result column="add_time" property="addTime" />
 	    <result column="update_time" property="updateTime" />
 	</resultMap>
@@ -19,6 +20,7 @@
 		t.name,
 		t.code,
 		t.status,
+		t.role_type,
 		t.add_time,
 		t.update_time
 	</sql>
@@ -86,12 +88,14 @@
 			name,
 			code,
 			status,
+			role_type,
 			add_time,
 			update_time
 		) VALUES (
 			#{name},
 			#{code},
 			#{status},
+			#{roleType},
 			#{addTime},
 			#{updateTime}
 		);
@@ -104,6 +108,7 @@
 			name = #{name},
 			code = #{code},
 			status = #{status},
+			role_type = #{roleType},
 			update_time = #{updateTime}
 		WHERE id = #{id}
 	</update>
