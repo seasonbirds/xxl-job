@@ -17,7 +17,7 @@
 
 		<!-- 2-content start -->
 
-		<#-- 查询区域 -->
+		<#-- 查询区域：角色、账号 -->
 		<div class="box" style="margin-bottom:9px;">
 			<div class="box-body">
 				<div class="row" id="data_filter" >
@@ -29,7 +29,7 @@
 								<option value="-1" >${I18n.system_all}</option>
 								<#if roleList?exists && roleList?size gt 0>
 									<#list roleList as role>
-										<option value="${role.oldRole}" >${role.name}</option>
+										<option value="${role.id}" >${role.name}</option>
 									</#list>
 								</#if>
 							</select>
@@ -72,7 +72,7 @@
 			</div>
 		</div>
 
-		<!-- 新增.模态框 -->
+		<!-- 新增.模态框：账号、密码、角色、权限 -->
 		<div class="modal fade" id="addModal" tabindex="-1" role="dialog"  aria-hidden="true">
 			<div class="modal-dialog">
 				<div class="modal-content">
@@ -95,7 +95,7 @@
 									<select class="form-control" name="role" >
 										<#if roleList?exists && roleList?size gt 0>
 											<#list roleList as role>
-												<option value="${role.oldRole}" >${role.name}</option>
+												<option value="${role.id}" >${role.name}</option>
 											</#list>
 										</#if>
 									</select>
@@ -127,7 +127,7 @@
 			</div>
 		</div>
 
-		<!-- 更新.模态框 -->
+		<!-- 更新.模态框：账号、密码、角色、权限 -->
 		<div class="modal fade" id="updateModal" tabindex="-1" role="dialog"  aria-hidden="true">
 			<div class="modal-dialog">
 				<div class="modal-content">
@@ -150,7 +150,7 @@
 									<select class="form-control" name="role" >
 										<#if roleList?exists && roleList?size gt 0>
 											<#list roleList as role>
-												<option value="${role.oldRole}" >${role.name}</option>
+												<option value="${role.id}" >${role.name}</option>
 											</#list>
 										</#if>
 									</select>
@@ -197,16 +197,25 @@
 <script>
 	$(function() {
 
-		<#-- 构建角色映射 -->
+		<#-- 构建角色映射：key=角色ID，value=角色名称 -->
+		<#-- 关联逻辑：xxl_job_user.role 关联 xxl_job_role.id -->
 		var roleMap = {};
+		<#-- 构建角色权限类型映射：key=角色ID，value=权限类型（0-普通用户，1-管理员） -->
+		var roleTypeMap = {};
 		<#if roleList?exists && roleList?size gt 0>
 			<#list roleList as role>
-				roleMap["${role.oldRole}"] = "${role.name}";
+				roleMap["${role.id}"] = "${role.name}";
+				roleTypeMap["${role.id}"] = ${role.roleType};
 			</#list>
 		</#if>
 
 		/**
-		 * init table
+		 * 初始化数据表格
+		 * 展示用户列表：账号、密码、角色
+		 * 
+		 * 关联说明：
+		 * - 用户表 `xxl_job_user.role` 字段关联角色表 `xxl_job_role.id`
+		 * - 角色表 `xxl_job_role.role_type` 字段用于权限判断
 		 */
 		$.adminTable.initTable({
 			table: '#data_list',
@@ -247,6 +256,7 @@
 					width: '10',
 					widthUnit: '%',
 					formatter: function(value, row, index) {
+						// 通过角色ID获取角色名称
 						var roleName = roleMap[value + ""];
 						return roleName ? roleName : value;
 					}
@@ -255,7 +265,7 @@
 		});
 
 		/**
-		 * init delete
+		 * 初始化删除操作
 		 */
 		$.adminTable.initDelete({
 			url: base_url + "/user/delete"
@@ -263,33 +273,47 @@
 
 		/**
 		 * 检查是否是管理员角色
+		 * 通过角色ID查询角色权限类型映射表
+		 * 
+		 * @param roleValue 角色ID（xxl_job_role.id）
+		 * @return true-管理员，false-普通用户
 		 */
 		function isAdminRole(roleValue) {
-			return roleValue == 1;
+			var roleType = roleTypeMap[roleValue + ""];
+			return roleType == 1;
 		}
 
 		/**
 		 * 根据角色值显示/隐藏权限选择
+		 * 管理员拥有全部权限，不需要配置执行器权限
+		 * 普通用户需要配置执行器权限
+		 * 
+		 * @param roleSelect 角色下拉框jQuery对象
+		 * @param permissionGroup 权限选择区域jQuery对象
 		 */
 		function togglePermissionByRole(roleSelect, permissionGroup) {
 			var roleValue = roleSelect.val();
 			if (isAdminRole(roleValue)) {
+				// 管理员：隐藏权限选择，清空已选权限
 				permissionGroup.parents('.form-group').hide();
 				permissionGroup.find('input[name="permission"]').prop("checked", false);
 			} else {
+				// 普通用户：显示权限选择
 				permissionGroup.parents('.form-group').show();
 			}
 		}
 
 		/**
-		 * init add
+		 * 初始化新增操作
+		 * 表单验证：账号格式、密码长度
 		 */
-		// add validator method
+		// 账号验证方法：小写字母开头，由小写字母和数字组成
 		jQuery.validator.addMethod("myValid01", function(value, element) {
 			var length = value.length;
 			var valid = /^[a-z][a-z0-9]*$/;
 			return this.optional(element) || valid.test(value);
 		}, I18n.user_username_valid );
+		
 		$.adminTable.initAdd( {
 			url: base_url + "/user/insert",
 			rules : {
@@ -314,38 +338,40 @@
 				}
 			},
 			writeFormData: function() {
+				// 打开新增窗口时，根据默认选中的角色显示/隐藏权限选择
 				var roleSelect = $("#addModal .form select[name='role']");
 				togglePermissionByRole(roleSelect, $('#addPermissionGroup'));
 			},
 			readFormData: function() {
-				// request
+				// 读取表单数据
 				return $("#addModal .form").serializeArray();
 			}
 		});
 
-		// add role change
+		// 角色选择变化事件：动态显示/隐藏权限选择
 		$("#addModal .form select[name=role]").change(function () {
 			togglePermissionByRole($(this), $('#addPermissionGroup'));
 		});
 
 		/**
-		 * init update
+		 * 初始化更新操作
 		 */
 		$.adminTable.initUpdate( {
 			url: base_url + "/user/update",
 			writeFormData: function(row) {
 
-				// base data
+				// 填充基础数据
 				$("#updateModal .form input[name='id']").val( row.id );
 				$("#updateModal .form input[name='username']").val( row.username );
 				$("#updateModal .form input[name='password']").val( '' );
+				// 选中用户当前绑定的角色
 				$("#updateModal .form select[name='role']").val(row.role);
 
-				// 根据角色值显示/隐藏权限
+				// 根据角色值显示/隐藏权限选择
 				var roleSelect = $("#updateModal .form select[name='role']");
 				togglePermissionByRole(roleSelect, $('#updatePermissionGroup'));
 
-				// permission
+				// 回显用户已有的执行器权限
 				var permissionArr = [];
 				if (row.permission) {
 					permissionArr = row.permission.split(",");
@@ -360,12 +386,12 @@
 
 			},
 			readFormData: function() {
-				// request
+				// 读取表单数据
 				return $("#updateModal .form").serializeArray();
 			}
 		});
 
-		// update role change
+		// 编辑时角色选择变化事件
 		$("#updateModal .form select[name=role]").change(function () {
 			togglePermissionByRole($(this), $('#updatePermissionGroup'));
 		});

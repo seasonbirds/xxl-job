@@ -2,7 +2,9 @@ package com.xxl.job.admin.controller.biz;
 
 import com.xxl.job.admin.constant.Consts;
 import com.xxl.job.admin.mapper.XxlJobRoleMapper;
+import com.xxl.job.admin.mapper.XxlJobUserMapper;
 import com.xxl.job.admin.model.XxlJobRole;
+import com.xxl.job.admin.model.XxlJobUser;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.sso.core.annotation.XxlSso;
 import com.xxl.tool.core.CollectionTool;
@@ -16,12 +18,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 /**
  * 角色管理控制器
  * 提供角色的增删改查、启用/禁用等功能
+ * 
+ * 关联说明：
+ * - 用户表 `xxl_job_user.role` 字段关联角色表 `xxl_job_role.id`
+ * - 角色表 `xxl_job_role.role_type` 字段用于权限判断（0-普通用户，1-管理员）
  *
  * @author xxl-job
  */
@@ -31,6 +38,9 @@ public class JobRoleController {
 
     @Resource
     private XxlJobRoleMapper xxlJobRoleMapper;
+
+    @Resource
+    private XxlJobUserMapper xxlJobUserMapper;
 
     /**
      * 角色管理页面入口
@@ -166,8 +176,11 @@ public class JobRoleController {
             return Response.ofFail(I18nUtil.getString("role_code_repeat"));
         }
 
-        // 设置默认值：默认启用
+        // 设置默认值：默认启用，权限类型默认普通用户
         xxlJobRole.setStatus(1);
+        if (xxlJobRole.getRoleType() != 0 && xxlJobRole.getRoleType() != 1) {
+            xxlJobRole.setRoleType(0);
+        }
         Date now = new Date();
         xxlJobRole.setAddTime(now);
         xxlJobRole.setUpdateTime(now);
@@ -233,6 +246,10 @@ public class JobRoleController {
         // 更新角色信息（状态保持不变，只能通过启用/禁用按钮修改）
         existRole.setName(xxlJobRole.getName());
         existRole.setCode(xxlJobRole.getCode());
+        // 允许更新权限类型
+        if (xxlJobRole.getRoleType() == 0 || xxlJobRole.getRoleType() == 1) {
+            existRole.setRoleType(xxlJobRole.getRoleType());
+        }
         existRole.setUpdateTime(new Date());
 
         // 执行更新
@@ -242,6 +259,7 @@ public class JobRoleController {
 
     /**
      * 删除角色
+     * 注意：关联了用户的角色不能删除
      *
      * @param ids 角色ID列表（目前只支持单个删除）
      * @return 操作结果
@@ -260,6 +278,13 @@ public class JobRoleController {
         XxlJobRole existRole = xxlJobRoleMapper.loadById(ids.get(0));
         if (existRole == null) {
             return Response.ofFail(I18nUtil.getString("role_not_exist"));
+        }
+
+        // 检查是否有关联用户：xxl_job_user.role 关联 xxl_job_role.id
+        // 注意：xxlJobUserMapper.pageList 第二个参数是 role（用户表的role字段）
+        List<XxlJobUser> users = xxlJobUserMapper.pageList(0, 1, null, ids.get(0));
+        if (users != null && !users.isEmpty()) {
+            return Response.ofFail(I18nUtil.getString("role_has_users_cannot_delete"));
         }
 
         // 执行删除
@@ -323,6 +348,31 @@ public class JobRoleController {
         }
 
         return Response.ofSuccess();
+    }
+
+    /**
+     * 根据角色ID查询该角色下的用户列表
+     * 用于角色管理页面的"查看用户"功能
+     *
+     * 关联逻辑：xxl_job_user.role 关联 xxl_job_role.id
+     *
+     * @param roleId 角色ID（即角色表的主键ID）
+     * @return 用户名称列表
+     */
+    @RequestMapping("/getUsersByRole")
+    @ResponseBody
+    @XxlSso(role = Consts.ADMIN_ROLE)
+    public Response<List<String>> getUsersByRole(@RequestParam int roleId) {
+
+        // 查询该角色下的所有用户：xxl_job_user.role = 角色ID
+        List<XxlJobUser> users = xxlJobUserMapper.pageList(0, 1000, null, roleId);
+        List<String> usernames = new ArrayList<>();
+        if (users != null) {
+            for (XxlJobUser user : users) {
+                usernames.add(user.getUsername());
+            }
+        }
+        return Response.ofSuccess(usernames);
     }
 
 }
