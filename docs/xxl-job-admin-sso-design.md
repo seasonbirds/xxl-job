@@ -277,9 +277,6 @@ xxl.job.sso.jwt.issuer=enterprise-portal
 # Token受众（可选，用于验证aud字段）
 xxl.job.sso.jwt.audience=xxl-job-admin
 
-# SSO登录失败跳转地址
-xxl.job.sso.login.path=/auth/login
-
 # 是否开启自动创建用户（默认false）
 # 如果开启，手机号不存在时自动创建用户
 xxl.job.sso.auto-create-user=false
@@ -289,6 +286,18 @@ xxl.job.sso.default.role=0
 
 # 自动创建用户的默认权限（执行器ID列表，逗号分隔）
 xxl.job.sso.default.permission=
+
+# ==================== 会话状态一致性配置 ====================
+# 企业运营后台SSO入口地址（会话过期时自动重定向到此地址）
+# 当xxl-job-admin会话过期时，如果配置了此项且开启了auto-redirect，
+# 会自动跳转到运营后台进行SSO验证，实现无缝续期
+# 示例: http://portal.example.com/api/sso/redirect-to-xxl-job
+xxl.job.sso.server-url=
+
+# 是否开启自动重定向到运营后台（默认false）
+# true=会话过期时自动跳转回运营后台进行SSO验证
+# false=会话过期时显示登录页面
+xxl.job.sso.auto-redirect=false
 ```
 
 #### 4.2.2 用户预创建流程
@@ -470,6 +479,209 @@ server.servlet.session.cookie.same-site=strict
 | SSO007 | 用户不存在 | 该手机号未在系统中注册 |
 | SSO008 | 用户已被禁用 | 账号状态异常 |
 | SSO009 | 系统异常 | 内部错误 |
+
+---
+
+## 6. 会话状态一致性方案
+
+### 6.1 问题分析
+
+**问题场景：**
+1. 用户在运营后台点击"任务调度"，通过SSO跳转到xxl-job-admin
+2. xxl-job-admin验证JWT成功，设置自己的会话状态（xxl-sso的Cookie）
+3. 过了一段时间，xxl-job-admin的会话过期（由`xxl-sso.token.timeout`控制，默认7天）
+4. 用户再次访问xxl-job-admin页面，被拦截器跳转到`/auth/login`
+5. 但此时用户在运营后台仍然是登录状态
+
+**状态不一致的表现：**
+- 运营后台：用户已登录
+- xxl-job-admin：会话过期，需要重新登录
+
+### 6.2 解决方案
+
+实现**自动重定向回运营后台**的机制：
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    会话状态一致性方案                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  用户访问xxl-job-admin页面                                           │
+│       │                                                             │
+│       ▼                                                             │
+│  ┌─────────────────┐                                                │
+│  │会话是否已过期？  │                                                │
+│  └────────┬────────┘                                                │
+│           │否                                                        │
+│           ▼                                                          │
+│      正常访问页面                                                    │
+│           │                                                          │
+│           │是                                                        │
+│           ▼                                                          │
+│  ┌─────────────────┐                                                │
+│  │SSO自动重定向     │                                                │
+│  │是否已开启？      │                                                │
+│  └────────┬────────┘                                                │
+│           │否                                                        │
+│           ▼                                                          │
+│      显示登录页面                                                    │
+│           │                                                          │
+│           │是                                                        │
+│           ▼                                                          │
+│  ┌──────────────────────────────────────────────┐                  │
+│  │  重定向到运营后台SSO入口                        │                  │
+│  │  {sso.server-url}?redirect={目标页面}         │                  │
+│  └──────────────────────┬───────────────────────┘                  │
+│                         │                                            │
+│                         ▼                                            │
+│  ┌──────────────────────────────────────────────┐                  │
+│  │  运营后台检测用户登录状态                       │                  │
+│  │  - 已登录：生成JWT，跳转回/auth/sso            │                  │
+│  │  - 未登录：跳转到运营后台登录页                 │                  │
+│  └──────────────────────┬───────────────────────┘                  │
+│                         │                                            │
+│                         ▼ (已登录)                                   │
+│  ┌──────────────────────────────────────────────┐                  │
+│  │  跳转回xxl-job-admin的/auth/sso端点            │                  │
+│  │  验证JWT → 设置新会话 → 跳转回目标页面          │                  │
+│  └──────────────────────────────────────────────┘                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.3 完整时序图
+
+```
+┌─────────┐         ┌──────────────┐         ┌──────────────┐
+│  用户   │         │ 企业运营后台   │         │ xxl-job-admin│
+└────┬────┘         └──────┬───────┘         └──────┬───────┘
+     │                     │                        │
+     │  1. 第一次SSO登录    │                        │
+     │────────────────────>│                        │
+     │                     │                        │
+     │  2. 跳转回/auth/sso  │                        │
+     │<─────────────────────────────────────────────│
+     │                     │                        │
+     │  ... (一段时间后) ...│                        │
+     │                     │                        │
+     │  3. 访问任务管理页面 │                        │
+     │─────────────────────────────────────────────>│
+     │                     │                        │
+     │                     │                        │ 4. 会话过期
+     │                     │                        │    拦截器跳转
+     │                     │                        │
+     │  5. 302重定向       │                        │
+     │<─────────────────────────────────────────────│
+     │  Location: /auth/login                        │
+     │                     │                        │
+     │  6. 访问/login      │                        │
+     │─────────────────────────────────────────────>│
+     │                     │                        │
+     │                     │                        │ 7. 检测SSO配置
+     │                     │                        │    autoRedirect=true
+     │                     │                        │
+     │  8. 302重定向       │                        │
+     │<─────────────────────────────────────────────│
+     │  Location: {sso.server-url}                  │
+     │  ?redirect=/xxl-job-admin/                   │
+     │                     │                        │
+     │  9. 访问运营后台    │                        │
+     │────────────────────>│                        │
+     │                     │                        │
+     │                     │ 10. 检测用户已登录      │
+     │                     │     生成新JWT Token     │
+     │                     │                        │
+     │  11. 302重定向       │                        │
+     │<────────────────────│                        │
+     │  Location: /auth/sso?token=xxx               │
+     │                     │                        │
+     │  12. 访问/auth/sso  │                        │
+     │─────────────────────────────────────────────>│
+     │                     │                        │
+     │                     │                        │ 13. 验证JWT
+     │                     │                        │    设置新会话
+     │                     │                        │
+     │  14. 302重定向       │                        │
+     │<─────────────────────────────────────────────│
+     │  Location: /xxl-job-admin/                   │
+     │                     │                        │
+     │  15. 正常访问页面    │                        │
+     │─────────────────────────────────────────────>│
+```
+
+### 6.4 新增配置项
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `xxl.job.sso.server-url` | String | 空 | 企业运营后台的SSO入口地址 |
+| `xxl.job.sso.auto-redirect` | boolean | false | 是否开启自动重定向 |
+
+**配置示例：**
+
+```properties
+# 企业运营后台SSO入口地址
+# 当xxl-job-admin会话过期时，会自动重定向到此地址
+xxl.job.sso.server-url=http://portal.example.com/api/sso/redirect-to-xxl-job
+
+# 开启自动重定向
+xxl.job.sso.auto-redirect=true
+```
+
+### 6.5 企业运营后台需要配合实现
+
+运营后台需要提供一个SSO入口接口，处理来自xxl-job-admin的重定向请求：
+
+```java
+/**
+ * 运营后台SSO入口
+ * 接收xxl-job-admin的重定向请求，验证用户登录状态后生成JWT跳转回去
+ */
+@GetMapping("/api/sso/redirect-to-xxl-job")
+public void redirectToXxlJob(HttpServletRequest request,
+                               HttpServletResponse response,
+                               @RequestParam(value = "redirect", required = false) String redirect)
+        throws IOException {
+    
+    // 1. 检查当前用户是否已登录
+    User currentUser = getCurrentUser(request);
+    
+    if (currentUser == null) {
+        // 2. 用户未登录，跳转到运营后台登录页
+        String loginUrl = buildLoginUrlWithRedirect(request.getRequestURL().toString());
+        response.sendRedirect(loginUrl);
+        return;
+    }
+    
+    // 3. 用户已登录，生成JWT Token
+    String token = JwtTokenGenerator.generateToken(currentUser.getPhone());
+    
+    // 4. 构建跳转回xxl-job-admin的URL
+    String xxlJobAdminBaseUrl = "http://xxl-job-server/xxl-job-admin";
+    String ssoUrl = xxlJobAdminBaseUrl + "/auth/sso?token=" + token;
+    
+    if (StringTool.isNotBlank(redirect)) {
+        ssoUrl += "&redirect=" + URLEncoder.encode(redirect, StandardCharsets.UTF_8);
+    }
+    
+    // 5. 跳转回xxl-job-admin
+    response.sendRedirect(ssoUrl);
+}
+```
+
+### 6.6 用户体验说明
+
+**开启自动重定向后的用户体验：**
+
+1. **用户感知**：整个过程对用户透明，用户感觉不到多次跳转
+2. **浏览器行为**：多次302重定向在网络层完成，用户只看到最终页面
+3. **登录状态**：两个系统的登录状态保持一致
+   - 运营后台登录 → xxl-job-admin自动登录
+   - 运营后台登出 → xxl-job-admin会话过期后需要重新登录
+
+**未开启自动重定向的情况：**
+
+1. xxl-job-admin会话过期后，用户会看到登录页面
+2. 用户需要手动返回运营后台，重新点击"任务调度"链接
 
 ---
 
