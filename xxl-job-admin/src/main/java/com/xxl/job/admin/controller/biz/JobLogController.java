@@ -9,9 +9,12 @@ import com.xxl.job.admin.model.XxlJobLog;
 import com.xxl.job.admin.scheduler.config.XxlJobAdminBootstrap;
 import com.xxl.job.admin.scheduler.exception.XxlJobException;
 import com.xxl.job.admin.service.XxlJobService;
+import com.xxl.job.admin.util.DataPermissionUtil;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.job.admin.util.JobGroupPermissionUtil;
 import com.xxl.job.core.context.XxlJobContext;
+import com.xxl.sso.core.helper.XxlSsoHelper;
+import com.xxl.sso.core.model.LoginInfo;
 import com.xxl.job.core.openapi.ExecutorBiz;
 import com.xxl.job.core.openapi.model.KillRequest;
 import com.xxl.job.core.openapi.model.LogRequest;
@@ -71,6 +74,10 @@ public class JobLogController {
 			throw new XxlJobException(I18nUtil.getString("jobgroup_empty"));
 		}
 
+		// get login info for data permission
+		Response<LoginInfo> loginInfoResponse = XxlSsoHelper.loginCheckWithAttr(request);
+		LoginInfo loginInfo = loginInfoResponse.getData();
+
 		// parse jobGroup
 		if (jobId > 0) {
 			// assign jobId (+ jobGroup)
@@ -78,6 +85,10 @@ public class JobLogController {
 			if (jobInfo == null) {
 				// jobId not exist, inteceptor
 				throw new RuntimeException(I18nUtil.getString("jobinfo_field_id") + I18nUtil.getString("system_unvalid"));
+			}
+			// valid data permission
+			if (!DataPermissionUtil.hasJobDataPermission(loginInfo, jobInfo)) {
+				throw new RuntimeException(I18nUtil.getString("system_permission_limit") + "[username=" + loginInfo.getUserName() + "]");
 			}
 			jobGroup = jobInfo.getJobGroup();
 		} else if (jobGroup > 0) {
@@ -99,6 +110,14 @@ public class JobLogController {
 
 		// find jobList
 		List<XxlJobInfo> jobInfoList = xxlJobInfoMapper.getJobsByGroup(jobGroup);
+
+		// filter jobInfoList by data permission (only for non-admin users)
+		if (!DataPermissionUtil.isAdmin(loginInfo)) {
+			String currentUserName = loginInfo.getUserName();
+			jobInfoList = jobInfoList.stream()
+					.filter(job -> currentUserName.equals(job.getAuthor()))
+					.toList();
+		}
 
 		// parse jobId
 		if (CollectionTool.isEmpty(jobInfoList)) {
@@ -130,7 +149,7 @@ public class JobLogController {
 										@RequestParam String filterTime) {
 
 		// valid jobGroup permission
-		JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
+		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
 
 		// valid jobId
 		if (jobId < 1) {
@@ -147,10 +166,16 @@ public class JobLogController {
 				triggerTimeEnd = DateTool.parseDateTime(temp[1]);
 			}
 		}
+
+		// data permission
+		String permissionAuthor = null;
+		if (!DataPermissionUtil.isAdmin(loginInfo)) {
+			permissionAuthor = loginInfo.getUserName();
+		}
 		
 		// page query
-		List<XxlJobLog> list = xxlJobLogMapper.pageList(offset, pagesize, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus);
-		int list_count = xxlJobLogMapper.pageListCount(offset, pagesize, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus);
+		List<XxlJobLog> list = xxlJobLogMapper.pageList(offset, pagesize, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus, permissionAuthor);
+		int list_count = xxlJobLogMapper.pageListCount(offset, pagesize, jobGroup, jobId, triggerTimeStart, triggerTimeEnd, logStatus, permissionAuthor);
 
 		// package result
 		PageModel<XxlJobLog> pageModel = new PageModel<>();
@@ -203,7 +228,12 @@ public class JobLogController {
 		}
 
 		// valid JobGroup permission
-		JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
+		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
+
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, jobInfo)) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
 
 		// request of kill
 		Response<String> runResult = null;
@@ -233,11 +263,20 @@ public class JobLogController {
 									@RequestParam("jobId") int jobId,
 									@RequestParam("type") int type){
 		// valid JobGroup permission
-		JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
+		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
 
 		// valid jobId
 		if (jobId < 1) {
 			return Response.ofFail(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_job"));
+		}
+
+		// valid data permission
+		XxlJobInfo jobInfo = xxlJobInfoMapper.loadById(jobId);
+		if (jobInfo == null) {
+			return Response.ofFail(I18nUtil.getString("jobinfo_glue_jobid_unvalid"));
+		}
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, jobInfo)) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
 		}
 
 		// opt
@@ -286,10 +325,15 @@ public class JobLogController {
 		}
 
 		// valid permission
-		JobGroupPermissionUtil.validJobGroupPermission(request, jobLog.getJobGroup());
+		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobLog.getJobGroup());
 
 		// load jobInfo
 		XxlJobInfo jobInfo = xxlJobInfoMapper.loadById(jobLog.getJobId());
+
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, jobInfo)) {
+			throw new RuntimeException(I18nUtil.getString("system_permission_limit") + "[username=" + loginInfo.getUserName() + "]");
+		}
 
 		// data
 		model.addAttribute("triggerCode", jobLog.getTriggerCode());
@@ -301,12 +345,19 @@ public class JobLogController {
 
 	@RequestMapping("/logDetailCat")
 	@ResponseBody
-	public Response<LogResult> logDetailCat(@RequestParam("logId") long logId, @RequestParam("fromLineNum") int fromLineNum){
+	public Response<LogResult> logDetailCat(HttpServletRequest request, @RequestParam("logId") long logId, @RequestParam("fromLineNum") int fromLineNum){
 		try {
 			// valid
-			XxlJobLog jobLog = xxlJobLogMapper.load(logId);	// todo, need to improve performance
+			XxlJobLog jobLog = xxlJobLogMapper.load(logId);
 			if (jobLog == null) {
 				return Response.ofFail(I18nUtil.getString("joblog_logid_unvalid"));
+			}
+
+			// valid data permission
+			Response<LoginInfo> loginInfoResponse = XxlSsoHelper.loginCheckWithAttr(request);
+			XxlJobInfo jobInfo = xxlJobInfoMapper.loadById(jobLog.getJobId());
+			if (!DataPermissionUtil.hasJobDataPermission(loginInfoResponse.getData(), jobInfo)) {
+				return Response.ofFail(I18nUtil.getString("system_permission_limit"));
 			}
 
 			// log cat
