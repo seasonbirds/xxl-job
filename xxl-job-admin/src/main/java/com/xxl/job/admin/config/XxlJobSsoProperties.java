@@ -47,6 +47,13 @@ public class XxlJobSsoProperties {
     private String loginFailureUrl = "/auth/login";
 
     /**
+     * 企业运营后台的SSO入口URL
+     * 当xxl-job-admin的Token过期时，自动重定向到该URL进行重新登录
+     * 格式示例：http://enterprise-host:port/enterprise/sso/xxl-job-redirect
+     */
+    private String enterpriseSsoUrl;
+
+    /**
      * 获取SSO功能是否启用
      * @return true表示启用，false表示禁用
      */
@@ -108,5 +115,21 @@ public class XxlJobSsoProperties {
      */
     public void setLoginFailureUrl(String loginFailureUrl) {
         this.loginFailureUrl = loginFailureUrl;
+    }
+
+    /**
+     * 获取企业运营后台的SSO入口URL
+     * @return 企业SSO入口URL
+     */
+    public String getEnterpriseSsoUrl() {
+        return enterpriseSsoUrl;
+    }
+
+    /**
+     * 设置企业运营后台的SSO入口URL
+     * @param enterpriseSsoUrl 企业SSO入口URL
+     */
+    public void setEnterpriseSsoUrl(String enterpriseSsoUrl) {
+        this.enterpriseSsoUrl = enterpriseSsoUrl;
     }
 }

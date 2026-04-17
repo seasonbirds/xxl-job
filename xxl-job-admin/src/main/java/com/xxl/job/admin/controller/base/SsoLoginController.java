@@ -153,6 +153,90 @@ public class SsoLoginController {
     }
 
     /**
+     * SSO会话过期重定向端点
+     * 
+     * 解决Token过期时两边系统登录状态不一致的问题。
+     * 
+     * 工作原理：
+     * 1. 当xxl-job-admin的Token过期时，xxl-sso拦截器会重定向到此端点
+     * 2. 此端点判断：
+     *    - 如果SSO已启用且配置了企业运营后台SSO入口URL → 重定向到企业运营后台
+     *    - 否则 → 重定向到本地登录页面
+     * 
+     * 状态同步流程：
+     * xxl-job-admin Token过期 → 重定向到此端点 → 判断是否配置企业SSO入口
+     *     → 已配置 → 重定向到企业运营后台 → 企业运营后台检测用户登录状态
+     *         → 用户已登录 → 重新生成Token → 跳转回xxl-job-admin（自动登录）
+     *         → 用户未登录 → 跳转到企业运营后台登录页面
+     *     → 未配置 → 重定向到xxl-job-admin本地登录页面
+     * 
+     * 端点：GET /auth/sso/redirect
+     * 
+     * @param request HTTP请求对象
+     * @return RedirectView 重定向视图
+     */
+    @RequestMapping("/sso/redirect")
+    @XxlSso(login = false)
+    public RedirectView ssoRedirect(HttpServletRequest request) {
+        if (xxlJobSsoProperties.isEnabled()) {
+            String enterpriseSsoUrl = xxlJobSsoProperties.getEnterpriseSsoUrl();
+            if (StringTool.isNotBlank(enterpriseSsoUrl)) {
+                String currentUrl = getCurrentFullUrl(request);
+                String redirectUrl = buildEnterpriseSsoRedirectUrl(enterpriseSsoUrl, currentUrl);
+                
+                logger.info("SSO session expired, redirect to enterprise SSO: {}", redirectUrl);
+                
+                RedirectView redirectView = new RedirectView();
+                redirectView.setUrl(redirectUrl);
+                redirectView.setContextRelative(false);
+                redirectView.setExposeModelAttributes(false);
+                return redirectView;
+            }
+        }
+        
+        logger.info("SSO not enabled or enterprise SSO URL not configured, redirect to local login page");
+        return createRedirectView("/auth/login");
+    }
+
+    /**
+     * 获取当前请求的完整URL
+     * 
+     * 用于构建重定向回xxl-job-admin的URL参数。
+     * 
+     * @param request HTTP请求对象
+     * @return 当前请求的完整URL
+     */
+    private String getCurrentFullUrl(HttpServletRequest request) {
+        StringBuffer url = request.getRequestURL();
+        String queryString = request.getQueryString();
+        if (queryString != null) {
+            url.append("?").append(queryString);
+        }
+        return url.toString();
+    }
+
+    /**
+     * 构建企业运营后台SSO重定向URL
+     * 
+     * 在企业SSO入口URL后添加redirect_url参数，
+     * 让企业运营后台在完成登录后跳转回xxl-job-admin。
+     * 
+     * @param enterpriseSsoUrl 企业运营后台SSO入口URL
+     * @param redirectUrl 登录成功后跳转回xxl-job-admin的URL
+     * @return 完整的重定向URL
+     */
+    private String buildEnterpriseSsoRedirectUrl(String enterpriseSsoUrl, String redirectUrl) {
+        try {
+            String separator = enterpriseSsoUrl.contains("?") ? "&" : "?";
+            String encodedRedirectUrl = java.net.URLEncoder.encode(redirectUrl, "UTF-8");
+            return enterpriseSsoUrl + separator + "redirect_url=" + encodedRedirectUrl;
+        } catch (Exception e) {
+            logger.warn("Failed to build enterprise SSO redirect URL", e);
+            return enterpriseSsoUrl;
+        }
+    }
+
+    /**
      * 创建重定向视图
      * 
      * 配置RedirectView的关键属性：
