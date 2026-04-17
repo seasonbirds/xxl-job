@@ -196,7 +196,7 @@ public class JobGroupController {
         }
 
 		// whether exists job
-		int count = xxlJobInfoMapper.pageListCount(0, 10, id, -1,  null, null, null);
+		int count = xxlJobInfoMapper.pageListCount(0, 10, id, -1,  null, null, null, null);
 		if (count > 0) {
 			return Response.ofFail( I18nUtil.getString("jobgroup_del_limit_0") );
 		}

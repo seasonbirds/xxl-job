@@ -4,6 +4,7 @@ import com.xxl.job.admin.mapper.XxlJobInfoMapper;
 import com.xxl.job.admin.mapper.XxlJobLogGlueMapper;
 import com.xxl.job.admin.model.XxlJobInfo;
 import com.xxl.job.admin.model.XxlJobLogGlue;
+import com.xxl.job.admin.util.DataPermissionUtil;
 import com.xxl.job.admin.util.I18nUtil;
 import com.xxl.job.admin.util.JobGroupPermissionUtil;
 import com.xxl.job.core.glue.GlueTypeEnum;
@@ -51,7 +52,12 @@ public class JobCodeController {
 		}
 
 		// valid jobGroup permission
-		JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
+		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobInfo.getJobGroup());
+
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, jobInfo)) {
+			throw new RuntimeException(I18nUtil.getString("system_permission_limit") + "[username=" + loginInfo.getUserName() + "]");
+		}
 
 		// Glue类型-字典
 		model.addAttribute("GlueTypeEnum", GlueTypeEnum.values());
@@ -85,6 +91,11 @@ public class JobCodeController {
 
 		// valid jobGroup permission
 		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, existsJobInfo.getJobGroup());
+
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, existsJobInfo)) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
 
 		// update new code
 		existsJobInfo.setGlueSource(glueSource);
