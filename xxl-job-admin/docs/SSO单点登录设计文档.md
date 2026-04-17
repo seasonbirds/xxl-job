@@ -2,119 +2,144 @@
 
 ---
 
-## 一、背景与目标
+## 目录
 
-### 1.1 业务背景
-
-xxl-job-admin作为企业运营后台的子系统，需要实现单点登录功能。用户在企业运营后台通过点击链接即可自动登录到xxl-job-admin，无需再次输入用户名密码。
-
-### 1.2 安全问题
-
-**原方案存在的安全问题**：
-
-| 问题 | 描述 | 风险等级 |
-|------|------|----------|
-| Token过期直接重定向 | Token过期时直接重定向到企业运营后台，运营后台无法验证请求合法性 | 高 |
-| 无Refresh Token机制 | 每次Token过期都需要用户重新跳转，体验差 | 中 |
-| 无CSRF防护 | 重定向到企业运营后台时无验证参数，易被利用 | 高 |
-
-### 1.3 改进目标
-
-1. **引入双Token机制**：Access Token短期有效，Refresh Token长期有效用于刷新
-2. **自动刷新机制**：Access Token过期时自动使用Refresh Token刷新，用户无感知
-3. **安全重定向**：只有Refresh Token也失效时才重定向到企业运营后台，并携带State参数防CSRF
-4. **企业运营后台验证**：State参数包含签名和时间戳，运营后台可以验证请求合法性
+1. [实现原理](#一实现原理)
+2. [系统交互](#二系统交互)
+3. [系统对接](#三系统对接)
+4. [安全评估](#四安全评估)
+5. [其他内容](#五其他内容)
 
 ---
 
-## 二、双Token机制设计
+## 一、实现原理
 
-### 2.1 Token类型
+### 1.1 现有登录机制分析
+
+xxl-job-admin当前使用 `xxl-sso-core` 框架实现登录功能：
+
+- **用户认证**：通过用户名（手机号）和密码验证用户身份
+- **会话管理**：使用 `XxlSsoHelper.loginWithCookie()` 创建登录会话
+- **Token存储**：通过 `SimpleLoginStore` 将Token写入数据库 `xxl_job_user.token` 字段
+
+### 1.2 单点登录方案设计
+
+采用 **HMAC-SHA256签名验证 + 双Token机制** 实现企业运营后台与xxl-job-admin的单点登录。
+
+#### 1.2.1 Token格式定义
+
+**来自企业运营后台的SSO Token**：
+
+```
+[Base64Url编码的Payload].[HMAC-SHA256签名]
+```
+
+**Payload JSON结构**：
+```json
+{
+  "phone": "13800138000",
+  "timestamp": 1713340800000,
+  "nonce": "optional-uuid"
+}
+```
+
+#### 1.2.2 双Token机制
+
+xxl-job-admin内部采用双Token机制提升安全性和用户体验：
 
 | Token类型 | 有效期 | 存储位置 | 用途 | 安全措施 |
 |-----------|--------|----------|------|----------|
-| **Access Token** | 30分钟（默认） | 内存/请求上下文 | 访问受保护资源 | JWT格式，HMAC-SHA256签名 |
-| **Refresh Token** | 7天（默认） | 加密Cookie | 刷新Access Token | AES-256-GCM加密，HttpOnly，Secure |
+| **Access Token** | 30分钟（默认） | 内存/上下文 | 访问受保护资源 | JWT格式，HMAC-SHA256签名 |
+| **Refresh Token** | 7天（默认） | 加密Cookie | 刷新Access Token | AES-256-GCM加密，HttpOnly，Secure，SameSite |
 
-### 2.2 Token结构
-
-#### Access Token（JWT格式）
+#### 1.2.3 验证流程
 
 ```
-[Header].[Payload].[Signature]
+1. 分割Token为[Payload, Signature]两部分
+2. 使用预共享密钥计算期望签名
+3. 常量时间比较签名是否一致（防止时序攻击）
+4. Base64Url解码Payload，解析JSON
+5. 验证时间戳是否在有效期内（默认5分钟）
+6. 根据手机号查询用户
+7. 创建xxl-sso会话
+8. 生成双Token（Access Token + Refresh Token）
+9. Refresh Token存入加密Cookie
 ```
 
-**Header**：
-```json
-{"alg":"HS256","typ":"JWT"}
-```
+#### 1.2.4 用户关联机制
 
-**Payload**：
-```json
-{
-  "type": "access",
-  "sub": "user_id",
-  "phone": "13800138000",
-  "iat": 1713340800,
-  "exp": 1713342600,
-  "nonce": "random_string",
-  "rt_id": "refresh_token_id"
-}
-```
+两个系统通过手机号进行用户关联：
 
-#### Refresh Token（加密存储）
-
-**明文Payload**：
-```json
-{
-  "type": "refresh",
-  "tid": "RT_1713340800000_abc123",
-  "sub": "user_id",
-  "phone": "13800138000",
-  "iat": 1713340800,
-  "exp": 1713945600,
-  "nonce": "random_string",
-  "ver": 1
-}
-```
-
-**加密方式**：AES-256-GCM，带认证标签
-
-**Cookie属性**：
-- HttpOnly：防止JavaScript访问
-- Secure：仅HTTPS传输（生产环境）
-- SameSite=Lax：防止CSRF
-- Path：应用上下文路径
-
-### 2.3 交互流程
-
-#### 首次登录流程
+- 企业运营后台的用户标识：手机号
+- xxl-job-admin的用户账号：`username` 字段（运营限制必须是手机号）
 
 ```
-企业运营后台                           xxl-job-admin
+企业运营后台                          xxl-job-admin
       │                                    │
-      │──1. 用户点击"任务调度"链接────────>│
-      │                                    │
-      │  2. 生成SSO Token (HMAC-SHA256)   │
-      │                                    │
-      │<──3. 302重定向────────────────────│
-      │    Location: /auth/sso/login      │
-      │    ?token=xxx&redirect_url=xxx    │
-      │                                    │
+      │  生成Token: {phone, timestamp}     │
       │───────────────────────────────────>│
       │                                    │
-      │                                    │──4. 验证SSO Token签名
-      │                                    │──5. 根据手机号查询用户
-      │                                    │──6. 创建xxl-sso会话
-      │                                    │──7. 生成Access Token + Refresh Token
-      │                                    │──8. Refresh Token存入加密Cookie
+      │                                    │  SELECT * FROM xxl_job_user 
+      │                                    │  WHERE username = phone
       │                                    │
-      │<──9. 302重定向────────────────────│
-      │    Set-Cookie: xxl_job_rt=xxx     │
-      │    (HttpOnly, Secure, SameSite)   │
+      │                                    │  自动创建登录会话
+      │                                    │
 ```
 
-#### Token自动刷新流程
+---
+
+## 二、系统交互
+
+### 2.1 首次登录流程
+
+```
+┌──────────┐         ┌─────────────────┐         ┌─────────────────────┐
+│   用户    │         │  企业运营后台      │         │    xxl-job-admin    │
+└────┬─────┘         └────────┬────────┘         └──────────┬──────────┘
+     │                        │                               │
+     │──1. 点击"任务调度"链接─>│                               │
+     │                        │                               │
+     │                        │──2. 构造Payload              │
+     │                        │   {phone, timestamp, nonce}  │
+     │                        │                               │
+     │                        │──3. Base64Url编码            │
+     │                        │                               │
+     │                        │──4. 计算HMAC-SHA256签名     │
+     │                        │                               │
+     │<──5. 302重定向─────────│                               │
+     │  Location: /auth/sso/  │                               │
+     │  login?token=xxx       │                               │
+     │                        │                               │
+     │──────────────────────────────────────────────────────>│
+     │                        │                               │
+     │                        │                               │──6. 验证SSO是否启用
+     │                        │                               │
+     │                        │                               │──7. 分割Token为[Payload,Signature]
+     │                        │                               │
+     │                        │                               │──8. 验证HMAC签名（常量时间比较）
+     │                        │                               │
+     │                        │                               │──9. 解码Payload，验证时间戳
+     │                        │                               │
+     │                        │                               │──10. 根据手机号查询用户
+     │                        │                               │
+     │                        │                               │──11. 创建xxl-sso会话
+     │                        │                               │
+     │                        │                               │──12. 生成Access Token + Refresh Token
+     │                        │                               │
+     │                        │                               │──13. Refresh Token存入加密Cookie
+     │                        │                               │
+     │<──────────────────────────────────────────────────────│
+     │  302重定向到目标页面    │                               │
+     │  Set-Cookie: xxl_job_rt│                               │
+     │  (HttpOnly, Secure)    │                               │
+     │                        │                               │
+```
+
+### 2.2 Token自动刷新流程
+
+**问题**：原方案中Token过期直接重定向到企业运营后台，运营后台无法验证请求合法性。
+
+**解决方案**：只有Refresh Token也失效时才重定向到企业运营后台，并携带State参数防CSRF。
 
 ```
 用户访问xxl-job-admin
@@ -152,53 +177,9 @@ xxl-sso拦截器检查会话
                                                    └───无效或用户未登录───> 跳转到企业运营后台登录页
 ```
 
----
+### 2.3 State参数机制
 
-## 三、安全改进详解
-
-### 3.1 双Token机制的安全性
-
-**为什么需要双Token？**
-
-| 场景 | 单Token方案 | 双Token方案 |
-|------|------------|-------------|
-| Token有效期 | 需要平衡安全性和用户体验 | Access Token短期（安全），Refresh Token长期（体验） |
-| Token泄露风险 | 长期Token泄露风险高 | Access Token短期泄露风险低，Refresh Token加密存储 |
-| 自动续期 | 无法实现 | Access Token过期自动刷新 |
-| 撤销机制 | 困难 | Refresh Token可撤销、可轮换 |
-
-### 3.2 Refresh Token安全措施
-
-**加密存储**：
-- 使用AES-256-GCM加密算法
-- 带认证标签，防止篡改
-- 密钥可配置，也可从secret派生
-
-**Cookie安全属性**：
-```java
-Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-cookie.setMaxAge(expireSeconds);
-cookie.setPath(contextPath);
-cookie.setHttpOnly(true);  // 防止XSS
-cookie.setSecure(isSecure);  // 仅HTTPS
-cookie.setAttribute("SameSite", "Lax");  // 防止CSRF
-```
-
-**单次使用机制**：
-- 每次刷新Access Token时，生成新的Refresh Token
-- 旧的Refresh Token标记为已使用
-- 防止Token复用攻击
-
-### 3.3 State参数防CSRF
-
-**问题场景**：
-
-攻击者可能构造以下链接诱导用户点击：
-```
-http://xxl-job-admin/auth/sso/redirect?redirect_url=http://evil.com
-```
-
-**解决方案**：State参数
+**State参数用途**：防止CSRF攻击，让企业运营后台可以验证请求合法性。
 
 **State参数格式**：
 ```
@@ -216,115 +197,54 @@ public static String generateState(String secret) {
 }
 ```
 
-**State参数验证（企业运营后台）**：
+**企业运营后台验证State**：
 ```java
 public static boolean validateState(String state, String secret, int expireSeconds) {
     String[] parts = state.split(":");
     if (parts.length != 3) return false;
     
+    // 1. 验证HMAC签名
     String payload = parts[0] + ":" + parts[1];
-    String signature = parts[2];
-    
-    // 1. 验证签名
-    if (!verifyHmacSha256(payload, signature, secret)) {
+    if (!verifyHmacSha256(payload, parts[2], secret)) {
         return false;
     }
     
-    // 2. 验证时间戳
+    // 2. 验证时间戳有效期
     long timestamp = Long.parseLong(parts[1]);
     return System.currentTimeMillis() - timestamp <= expireSeconds * 1000L;
 }
 ```
 
-### 3.4 企业运营后台对接说明
-
-**企业运营后台需要实现的功能**：
-
-1. **SSO入口端点**：
-   - 路径示例：`/enterprise/sso/xxl-job-redirect`
-   - 功能：接收来自xxl-job-admin的重定向请求
-
-2. **验证State参数**：
-   - 验证HMAC-SHA256签名
-   - 验证时间戳有效期
-   - 防止CSRF攻击
-
-3. **检查用户登录状态**：
-   - 用户已登录 → 生成SSO Token，跳转回xxl-job-admin
-   - 用户未登录 → 跳转到登录页面
-
-**企业运营后台示例代码**：
-
-```java
-@Controller
-@RequestMapping("/enterprise")
-public class EnterpriseSsoController {
-
-    @Value("${xxl.job.sso.secret}")
-    private String ssoSecret;
-
-    @Value("${xxl.job.sso.admin.url}")
-    private String adminUrl;
-
-    /**
-     * xxl-job-admin SSO入口
-     * 接收来自xxl-job-admin的重定向请求
-     */
-    @GetMapping("/sso/xxl-job-redirect")
-    public RedirectView xxlJobSsoRedirect(
-            @RequestParam(value = "state", required = false) String state,
-            @RequestParam(value = "redirect_url", required = false) String redirectUrl,
-            HttpServletRequest request) {
-        
-        // 1. 验证State参数（防CSRF）
-        if (state != null && !CryptoUtil.validateState(state, ssoSecret, 300)) {
-            logger.warn("Invalid state parameter: {}", state);
-            return new RedirectView("/login");
-        }
-        
-        // 2. 检查用户登录状态
-        if (!isUserLoggedIn(request)) {
-            // 用户未登录，跳转到登录页
-            String loginRedirect = "/login?redirect=" + 
-                URLEncoder.encode(request.getRequestURL().toString(), "UTF-8");
-            return new RedirectView(loginRedirect);
-        }
-        
-        // 3. 获取当前用户手机号
-        String phone = getCurrentUserPhone(request);
-        
-        // 4. 生成SSO Token
-        String token = XxlJobSsoTokenGenerator.generateToken(phone, ssoSecret);
-        
-        // 5. 构建跳转回xxl-job-admin的URL
-        String targetUrl = (redirectUrl != null && !redirectUrl.isEmpty()) 
-            ? redirectUrl 
-            : adminUrl + "/";
-        
-        String ssoLoginUrl = adminUrl + "/auth/sso/login" +
-            "?token=" + URLEncoder.encode(token, "UTF-8") +
-            "&redirect_url=" + URLEncoder.encode(targetUrl, "UTF-8");
-        
-        return new RedirectView(ssoLoginUrl);
-    }
-}
-```
-
 ---
 
-## 四、系统对接
+## 三、系统对接
 
-### 4.1 xxl-job-admin配置
+### 3.1 对接前提
+
+| 要求项 | 说明 |
+|--------|------|
+| 用户同步 | xxl-job-admin中的 `username` 必须是手机号格式 |
+| 时间同步 | 两个系统的服务器时间误差不超过60秒 |
+| 密钥一致 | 企业运营后台与xxl-job-admin配置相同的预共享密钥 |
+
+### 3.2 xxl-job-admin配置
+
+**配置文件**：`application.properties`
 
 ```properties
 ### 启用SSO
 xxl.job.sso.enabled=true
 
 ### 预共享密钥（与企业运营后台一致）
+### 要求：至少32个字符的强随机字符串
 xxl.job.sso.secret=your-32-character-strong-secret-key
+
+### 来自企业运营后台的SSO Token有效期（秒）
+xxl.job.sso.token.expire.seconds=300
 
 ### 企业运营后台SSO入口URL
 ### 当Refresh Token失效时，重定向到此URL
+### 格式示例：http://enterprise-host:port/enterprise/sso/xxl-job-redirect
 xxl.job.sso.enterprise.sso.url=http://enterprise-host:port/enterprise/sso/xxl-job-redirect
 
 ### === 双Token配置 ===
@@ -338,12 +258,12 @@ xxl.job.sso.refresh.token.expire.seconds=604800
 ### 生成方式：openssl rand -base64 32
 xxl.job.sso.refresh.token.encrypt.key=
 
-### xxl-sso配置（已预设）
+### xxl-sso原有配置（已预设）
 xxl-sso.client.excluded.paths=/auth/sso/login,/auth/sso/redirect
 xxl-sso.client.login.path=/auth/sso/redirect
 ```
 
-### 4.2 企业运营后台配置
+### 3.3 企业运营后台配置
 
 ```properties
 ### xxl-job-admin地址
@@ -356,7 +276,179 @@ xxl.job.sso.secret=your-32-character-strong-secret-key
 xxl.job.sso.token.expire.seconds=300
 ```
 
-### 4.3 端点清单
+### 3.4 企业运营后台Token生成
+
+**Token工具类**：
+
+```java
+public class XxlJobSsoTokenGenerator {
+
+    private static final String HMAC_SHA256 = "HmacSHA256";
+
+    /**
+     * 生成SSO Token
+     */
+    public static String generateToken(String phone, String secret) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("phone", phone);
+        payload.put("timestamp", System.currentTimeMillis());
+        payload.put("nonce", UUID.randomUUID().toString());
+
+        String payloadJson = GsonTool.toJson(payload);
+        String payloadBase64 = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+
+        String signature = calculateHmacSha256(payloadBase64, secret);
+        return payloadBase64 + "." + signature;
+    }
+
+    /**
+     * 构建SSO登录URL
+     */
+    public static String buildSsoLoginUrl(String phone, String secret, 
+                                           String adminUrl, String redirectUrl) {
+        String token = generateToken(phone, secret);
+        
+        return adminUrl + "/auth/sso/login" +
+            "?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8) +
+            "&redirect_url=" + URLEncoder.encode(redirectUrl, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 计算HMAC-SHA256签名
+     */
+    private static String calculateHmacSha256(String data, String secret) {
+        try {
+            SecretKeySpec keySpec = new SecretKeySpec(
+                    secret.getBytes(StandardCharsets.UTF_8), HMAC_SHA256);
+            Mac mac = Mac.getInstance(HMAC_SHA256);
+            mac.init(keySpec);
+            byte[] result = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(result);
+        } catch (Exception e) {
+            throw new RuntimeException("HMAC-SHA256 calculation failed", e);
+        }
+    }
+
+    /**
+     * 验证State参数（xxl-job-admin重定向时需要）
+     */
+    public static boolean validateState(String state, String secret, int expireSeconds) {
+        if (state == null || state.isEmpty()) {
+            return false;
+        }
+        
+        String[] parts = state.split(":");
+        if (parts.length != 3) {
+            return false;
+        }
+        
+        String payload = parts[0] + ":" + parts[1];
+        String signature = parts[2];
+        
+        // 验证签名
+        String expectedSignature = calculateHmacSha256(payload, secret);
+        if (!constantTimeEquals(signature, expectedSignature)) {
+            return false;
+        }
+        
+        // 验证时间戳
+        try {
+            long timestamp = Long.parseLong(parts[1]);
+            long now = System.currentTimeMillis();
+            return now - timestamp <= expireSeconds * 1000L;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 常量时间比较（防止时序攻击）
+     */
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        byte[] aBytes = a.getBytes(StandardCharsets.UTF_8);
+        byte[] bBytes = b.getBytes(StandardCharsets.UTF_8);
+        if (aBytes.length != bBytes.length) {
+            return false;
+        }
+        int result = 0;
+        for (int i = 0; i < aBytes.length; i++) {
+            result |= aBytes[i] ^ bBytes[i];
+        }
+        return result == 0;
+    }
+}
+```
+
+**企业运营后台SSO入口控制器**：
+
+```java
+@Controller
+@RequestMapping("/enterprise")
+public class EnterpriseSsoController {
+
+    @Value("${xxl.job.sso.secret}")
+    private String ssoSecret;
+
+    @Value("${xxl.job.sso.admin.url}")
+    private String adminUrl;
+
+    /**
+     * 用户点击"任务调度"链接的入口
+     */
+    @GetMapping("/xxl-job-redirect")
+    public RedirectView redirectToXxlJob(HttpServletRequest request) {
+        String phone = getCurrentUserPhone(request);
+        String redirectUrl = adminUrl + "/";
+        String ssoUrl = XxlJobSsoTokenGenerator.buildSsoLoginUrl(
+                phone, ssoSecret, adminUrl, redirectUrl
+        );
+        return new RedirectView(ssoUrl);
+    }
+
+    /**
+     * 接收xxl-job-admin的重定向请求（Token过期时）
+     */
+    @GetMapping("/sso/xxl-job-redirect")
+    public RedirectView xxlJobSsoRedirect(
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "redirect_url", required = false) String redirectUrl,
+            HttpServletRequest request) {
+        
+        // 1. 验证State参数（防CSRF）
+        if (state != null && !XxlJobSsoTokenGenerator.validateState(state, ssoSecret, 300)) {
+            logger.warn("Invalid state parameter");
+            return new RedirectView("/login");
+        }
+        
+        // 2. 检查用户登录状态
+        if (!isUserLoggedIn(request)) {
+            // 用户未登录，跳转到登录页
+            String loginRedirect = "/login?redirect=" + 
+                URLEncoder.encode(request.getRequestURL().toString(), "UTF-8");
+            return new RedirectView(loginRedirect);
+        }
+        
+        // 3. 用户已登录，生成SSO Token并跳转回xxl-job-admin
+        String phone = getCurrentUserPhone(request);
+        String targetUrl = (redirectUrl != null && !redirectUrl.isEmpty()) 
+            ? redirectUrl 
+            : adminUrl + "/";
+        
+        String ssoUrl = XxlJobSsoTokenGenerator.buildSsoLoginUrl(
+                phone, ssoSecret, adminUrl, targetUrl
+        );
+        
+        return new RedirectView(ssoUrl);
+    }
+}
+```
+
+### 3.5 端点清单
 
 | 端点 | 方法 | 所属系统 | 说明 |
 |------|------|----------|------|
@@ -366,7 +458,95 @@ xxl.job.sso.token.expire.seconds=300
 
 ---
 
-## 五、新增文件清单
+## 四、安全评估
+
+### 4.1 安全机制
+
+| 安全项 | 实现方案 | 说明 |
+|--------|----------|------|
+| 完整性保护 | HMAC-SHA256签名 | 防止Token被篡改 |
+| 时效性保护 | 时间戳验证 | Token必须在有效期内使用 |
+| 重放攻击防护 | 短有效期 + 时间戳 | 过期Token无法使用 |
+| 时序攻击防护 | 常量时间比较 | 防止通过响应时间推断正确签名 |
+| Refresh Token加密 | AES-256-GCM | 带认证标签的加密模式 |
+| Cookie安全 | HttpOnly + Secure + SameSite | 防止XSS和CSRF |
+| 跨系统请求验证 | State参数 | 防止CSRF，企业运营后台可验证请求合法性 |
+
+### 4.2 风险分析
+
+#### 风险1：Token泄露
+
+**场景**：Token在URL中传递可能被日志记录或网络嗅探。
+
+**缓解措施**：
+
+| 措施 | 说明 |
+|------|------|
+| 短有效期 | 来自企业运营后台的Token默认5分钟过期 |
+| HTTPS强制 | 生产环境必须使用HTTPS |
+| 日志保护 | 不记录完整的Token |
+
+#### 风险2：重放攻击
+
+**场景**：攻击者截获有效的Token后重复使用。
+
+**缓解措施**：
+
+| 措施 | 说明 |
+|------|------|
+| 时间戳验证 | 验证timestamp字段 |
+| 短有效期 | 5分钟有效期限制攻击窗口 |
+| Nonce可选 | 可实现Nonce缓存机制 |
+
+#### 风险3：密钥泄露
+
+**场景**：预共享密钥被泄露，攻击者可以伪造任意用户的Token。
+
+**缓解措施**：
+
+| 措施 | 说明 |
+|------|------|
+| 强密钥 | 至少32个随机字符 |
+| 环境变量 | 密钥不硬编码，通过环境变量注入 |
+| 定期轮换 | 建议每3个月更换一次密钥 |
+
+#### 风险4：CSRF攻击（重定向时）
+
+**场景**：攻击者构造恶意链接诱导用户点击：
+```
+http://xxl-job-admin/auth/sso/redirect?redirect_url=http://evil.com
+```
+
+**缓解措施**：
+
+| 措施 | 说明 |
+|------|------|
+| State参数 | 携带HMAC签名和时间戳的State参数 |
+| 企业运营后台验证 | 企业运营后台必须验证State参数有效性 |
+| 同源检查 | redirect_url只允许同源URL |
+
+### 4.3 安全对比
+
+| 维度 | 原方案 | 改进方案 |
+|------|--------|----------|
+| Token过期处理 | 直接重定向到企业运营后台 | 先尝试Refresh Token自动刷新，失败才重定向 |
+| 重定向安全性 | 无验证参数，运营后台无法判断请求合法性 | 携带State参数（签名+时间戳），运营后台可验证 |
+| 用户体验 | 每次过期都需跳转 | Refresh Token有效期内自动刷新，用户无感知 |
+| Token存储 | 单Token，长期有效 | 双Token，Access Token短期，Refresh Token加密存储 |
+
+### 4.4 生产环境强制要求
+
+- [ ] **HTTPS**：所有SSO相关通信必须使用HTTPS
+- [ ] **强密钥**：预共享密钥至少32个随机字符
+- [ ] **环境变量**：密钥通过环境变量注入，不硬编码
+- [ ] **日志保护**：日志中不记录完整的Token
+- [ ] **State验证**：企业运营后台必须验证State参数
+
+---
+
+## 五、其他内容
+
+### 5.1 新增文件清单
 
 | 文件路径 | 说明 |
 |----------|------|
@@ -375,41 +555,46 @@ xxl.job.sso.token.expire.seconds=300
 | `service/token/RefreshTokenInfo.java` | Refresh Token信息类 |
 | `service/token/TokenService.java` | Token服务接口 |
 | `service/token/TokenServiceImpl.java` | Token服务实现 |
-| `util/CryptoUtil.java` | 加密工具类（AES、HMAC、常量时间比较） |
+| `util/CryptoUtil.java` | 加密工具类（AES-256-GCM、HMAC-SHA256、常量时间比较） |
 | `util/TokenCookieUtil.java` | Token Cookie工具类 |
-| `config/XxlJobSsoProperties.java` | SSO配置属性（已更新） |
-| `controller/base/SsoLoginController.java` | SSO控制器（已更新） |
 
----
+### 5.2 更新文件清单
 
-## 六、安全检查清单
+| 文件路径 | 更新内容 |
+|----------|----------|
+| `config/XxlJobSsoProperties.java` | 新增双Token配置项 |
+| `controller/base/SsoLoginController.java` | 支持自动刷新、State参数 |
+| `resources/application.properties` | 新增双Token配置 |
 
-### 开发阶段
+### 5.3 测试清单
 
-- [ ] 预共享密钥使用强随机字符串（至少32字符）
-- [ ] 密钥不硬编码，使用环境变量或配置中心
-- [ ] Refresh Token使用AES-256-GCM加密
-- [ ] Refresh Token Cookie设置HttpOnly、Secure、SameSite属性
-- [ ] State参数包含签名和时间戳验证
-- [ ] 企业运营后台验证State参数
+#### 功能测试
 
-### 测试阶段
-
+- [ ] 企业运营后台点击链接可自动登录
 - [ ] Access Token过期时自动刷新
 - [ ] Refresh Token过期时携带State参数重定向
-- [ ] 企业运营后台验证State参数有效性
+- [ ] 企业运营后台验证State参数
+
+#### 安全测试
+
 - [ ] 无效State参数被拒绝
-- [ ] Refresh Token轮换机制正常工作
+- [ ] 过期Token无法使用
+- [ ] 签名篡改后验证失败
+- [ ] 外部redirect_url被拦截
 
-### 生产环境
+### 5.4 回滚方案
 
-- [ ] 强制使用HTTPS
-- [ ] 密钥定期轮换（建议每3个月）
-- [ ] 监控SSO登录异常
-- [ ] 日志不记录完整Token
+如需快速禁用SSO功能：
+
+```properties
+xxl.job.sso.enabled=false
+```
+
+禁用后：
+- 用户通过传统的用户名密码方式登录
+- SSO端点将拒绝访问，重定向到登录页面
 
 ---
 
-**文档版本**：v3.0  
-**最后更新**：2026-04-17  
-**安全改进**：双Token机制、自动刷新、State参数防CSRF
+**文档版本**：v4.0  
+**最后更新**：2026-04-17
