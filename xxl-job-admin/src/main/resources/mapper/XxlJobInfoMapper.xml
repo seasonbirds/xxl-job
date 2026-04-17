@@ -84,6 +84,9 @@
 			<if test="author != null and author != ''">
 				AND t.author like CONCAT(CONCAT('%', #{author}), '%')
 			</if>
+			<if test="permissionAuthor != null and permissionAuthor != ''">
+				AND t.author = #{permissionAuthor}
+			</if>
 		</trim>
 		ORDER BY id DESC
 		LIMIT #{offset}, #{pagesize}
@@ -107,6 +110,9 @@
 			</if>
 			<if test="author != null and author != ''">
 				AND t.author like CONCAT(CONCAT('%', #{author}), '%')
+			</if>
+			<if test="permissionAuthor != null and permissionAuthor != ''">
+				AND t.author = #{permissionAuthor}
 			</if>
 		</trim>
 	</select>

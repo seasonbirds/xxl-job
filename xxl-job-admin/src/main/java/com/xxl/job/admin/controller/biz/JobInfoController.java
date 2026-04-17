@@ -90,10 +90,10 @@ public class JobInfoController {
 													@RequestParam String author) {
 
 		// valid jobGroup permission
-		JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
+		LoginInfo loginInfo = JobGroupPermissionUtil.validJobGroupPermission(request, jobGroup);
 
 		// page
-		return xxlJobService.pageList(offset, pagesize, jobGroup, triggerStatus, jobDesc, executorHandler, author);
+		return xxlJobService.pageList(offset, pagesize, jobGroup, triggerStatus, jobDesc, executorHandler, author, loginInfo);
 	}
 	
 	@RequestMapping("/insert")

@@ -14,6 +14,7 @@ import com.xxl.job.admin.scheduler.trigger.TriggerTypeEnum;
 import com.xxl.job.admin.scheduler.type.ScheduleTypeEnum;
 import com.xxl.job.admin.service.XxlJobService;
 import com.xxl.job.admin.util.I18nUtil;
+import com.xxl.job.admin.util.DataPermissionUtil;
 import com.xxl.job.admin.util.JobGroupPermissionUtil;
 import com.xxl.job.core.constant.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
@@ -51,11 +52,16 @@ public class XxlJobServiceImpl implements XxlJobService {
 	private XxlJobLogReportMapper xxlJobLogReportMapper;
 	
 	@Override
-	public Response<PageModel<XxlJobInfo>> pageList(int offset, int pagesize, int jobGroup, int triggerStatus, String jobDesc, String executorHandler, String author) {
+	public Response<PageModel<XxlJobInfo>> pageList(int offset, int pagesize, int jobGroup, int triggerStatus, String jobDesc, String executorHandler, String author, LoginInfo loginInfo) {
+
+		String permissionAuthor = null;
+		if (!DataPermissionUtil.isAdmin(loginInfo)) {
+			permissionAuthor = loginInfo.getUserName();
+		}
 
 		// page list
-		List<XxlJobInfo> list = xxlJobInfoMapper.pageList(offset, pagesize, jobGroup, triggerStatus, jobDesc, executorHandler, author);
-		int list_count = xxlJobInfoMapper.pageListCount(offset, pagesize, jobGroup, triggerStatus, jobDesc, executorHandler, author);
+		List<XxlJobInfo> list = xxlJobInfoMapper.pageList(offset, pagesize, jobGroup, triggerStatus, jobDesc, executorHandler, author, permissionAuthor);
+		int list_count = xxlJobInfoMapper.pageListCount(offset, pagesize, jobGroup, triggerStatus, jobDesc, executorHandler, author, permissionAuthor);
 
 		// package result
 		PageModel<XxlJobInfo> pageModel = new PageModel<>();
@@ -270,6 +276,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 			return Response.ofFail ( (I18nUtil.getString("jobinfo_field_id")+I18nUtil.getString("system_not_found")) );
 		}
 
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, exists_jobInfo)) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
+
 		// next trigger time (5s后生效，避开预读周期)
 		long nextTriggerTime = exists_jobInfo.getTriggerNextTime();
 		boolean scheduleDataNotChanged = jobInfo.getScheduleType().equals(exists_jobInfo.getScheduleType())
@@ -328,6 +339,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
 		}
 
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, xxlJobInfo)) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
+
 		xxlJobInfoMapper.delete(id);
 		xxlJobLogMapper.delete(id);
 		xxlJobLogGlueMapper.deleteByJobId(id);
@@ -349,6 +365,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 
 		// valid jobGroup permission
 		if (!JobGroupPermissionUtil.hasJobGroupPermission(loginInfo, xxlJobInfo.getJobGroup())) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
+
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, xxlJobInfo)) {
 			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
 		}
 
@@ -400,6 +421,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
 		}
 
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, xxlJobInfo)) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
+
 		// stop
 		xxlJobInfo.setTriggerStatus(TriggerStatus.STOPPED.getValue());
 		xxlJobInfo.setTriggerLastTime(0);
@@ -425,6 +451,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 
 		// valid jobGroup permission
 		if (!JobGroupPermissionUtil.hasJobGroupPermission(loginInfo, xxlJobInfo.getJobGroup())) {
+			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
+		}
+
+		// valid data permission
+		if (!DataPermissionUtil.hasJobDataPermission(loginInfo, xxlJobInfo)) {
 			return Response.ofFail(I18nUtil.getString("system_permission_limit"));
 		}
 
