@@ -54,6 +54,34 @@ public class XxlJobSsoProperties {
     private String enterpriseSsoUrl;
 
     /**
+     * Access Token有效期（秒）
+     * 默认值：1800秒（30分钟）
+     * Access Token用于日常访问资源，短期有效
+     */
+    private int accessTokenExpireSeconds = 1800;
+
+    /**
+     * Refresh Token有效期（秒）
+     * 默认值：604800秒（7天）
+     * Refresh Token用于刷新Access Token，长期有效
+     */
+    private int refreshTokenExpireSeconds = 604800;
+
+    /**
+     * Refresh Token加密密钥（Base64编码，32字节）
+     * 用于AES-256-GCM加密Refresh Token
+     * 如未配置，将使用secret派生的密钥
+     */
+    private String refreshTokenEncryptKey;
+
+    /**
+     * State参数有效期（秒）
+     * 默认值：300秒（5分钟）
+     * 用于防止CSRF攻击的State参数有效期
+     */
+    private int stateExpireSeconds = 300;
+
+    /**
      * 获取SSO功能是否启用
      * @return true表示启用，false表示禁用
      */
@@ -131,5 +159,69 @@ public class XxlJobSsoProperties {
      */
     public void setEnterpriseSsoUrl(String enterpriseSsoUrl) {
         this.enterpriseSsoUrl = enterpriseSsoUrl;
+    }
+
+    /**
+     * 获取Access Token有效期（秒）
+     * @return Access Token有效期
+     */
+    public int getAccessTokenExpireSeconds() {
+        return accessTokenExpireSeconds;
+    }
+
+    /**
+     * 设置Access Token有效期（秒）
+     * @param accessTokenExpireSeconds Access Token有效期
+     */
+    public void setAccessTokenExpireSeconds(int accessTokenExpireSeconds) {
+        this.accessTokenExpireSeconds = accessTokenExpireSeconds;
+    }
+
+    /**
+     * 获取Refresh Token有效期（秒）
+     * @return Refresh Token有效期
+     */
+    public int getRefreshTokenExpireSeconds() {
+        return refreshTokenExpireSeconds;
+    }
+
+    /**
+     * 设置Refresh Token有效期（秒）
+     * @param refreshTokenExpireSeconds Refresh Token有效期
+     */
+    public void setRefreshTokenExpireSeconds(int refreshTokenExpireSeconds) {
+        this.refreshTokenExpireSeconds = refreshTokenExpireSeconds;
+    }
+
+    /**
+     * 获取Refresh Token加密密钥
+     * @return Base64编码的加密密钥
+     */
+    public String getRefreshTokenEncryptKey() {
+        return refreshTokenEncryptKey;
+    }
+
+    /**
+     * 设置Refresh Token加密密钥
+     * @param refreshTokenEncryptKey Base64编码的加密密钥（32字节）
+     */
+    public void setRefreshTokenEncryptKey(String refreshTokenEncryptKey) {
+        this.refreshTokenEncryptKey = refreshTokenEncryptKey;
+    }
+
+    /**
+     * 获取State参数有效期（秒）
+     * @return State参数有效期
+     */
+    public int getStateExpireSeconds() {
+        return stateExpireSeconds;
+    }
+
+    /**
+     * 设置State参数有效期（秒）
+     * @param stateExpireSeconds State参数有效期
+     */
+    public void setStateExpireSeconds(int stateExpireSeconds) {
+        this.stateExpireSeconds = stateExpireSeconds;
     }
 }
