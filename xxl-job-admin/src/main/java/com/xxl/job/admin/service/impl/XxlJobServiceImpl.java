@@ -82,9 +82,9 @@ public class XxlJobServiceImpl implements XxlJobService {
 		if (StringTool.isBlank(jobInfo.getJobDesc())) {
 			return Response.ofFail ( (I18nUtil.getString("system_please_input")+I18nUtil.getString("jobinfo_field_jobdesc")) );
 		}
-		if (StringTool.isBlank(jobInfo.getAuthor())) {
-			return Response.ofFail ( (I18nUtil.getString("system_please_input")+I18nUtil.getString("jobinfo_field_author")) );
-		}
+
+		// force set author to current login user
+		jobInfo.setAuthor(loginInfo.getUserName());
 
 		// valid trigger
 		ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(jobInfo.getScheduleType(), null);
@@ -144,6 +144,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 					}
 					// valid jobGroup permission
 					if (!JobGroupPermissionUtil.hasJobGroupPermission(loginInfo, childJobInfo.getJobGroup())) {
+						return Response.ofFail (
+								MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_permission_limit")), childJobIdItem));
+					}
+					// valid data permission
+					if (!DataPermissionUtil.hasJobDataPermission(loginInfo, childJobInfo)) {
 						return Response.ofFail (
 								MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_permission_limit")), childJobIdItem));
 					}
@@ -245,6 +250,11 @@ public class XxlJobServiceImpl implements XxlJobService {
 					}
 					// valid jobGroup permission
 					if (!JobGroupPermissionUtil.hasJobGroupPermission(loginInfo, childJobInfo.getJobGroup())) {
+						return Response.ofFail (
+								MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_permission_limit")), childJobIdItem));
+					}
+					// valid data permission
+					if (!DataPermissionUtil.hasJobDataPermission(loginInfo, childJobInfo)) {
 						return Response.ofFail (
 								MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_permission_limit")), childJobIdItem));
 					}
